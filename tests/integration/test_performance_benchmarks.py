@@ -85,7 +85,7 @@ class TestOllamaSDKEdgeCases:
             response = client.list()
 
             # All models should be present
-            assert len(response.models) == 3
+            assert len(response["models"]) == 3
 
     def test_very_large_model_list(self):
         """Test handling of very large model lists."""
@@ -101,7 +101,7 @@ class TestOllamaSDKEdgeCases:
             response = client.list()
 
             # Should handle large lists
-            assert len(response.models) <= 1000  # May filter some
+            assert len(response["models"]) <= 1000  # May filter some
 
             # Should complete in reasonable time
             start = time.time()

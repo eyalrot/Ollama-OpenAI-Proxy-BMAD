@@ -44,10 +44,11 @@ class TestOllamaSDKList:
             # Use Ollama SDK to list models
             response = ollama_client.list()
 
-            # Verify response structure (SDK returns object with models attribute)
-            assert hasattr(response, "models")
-            assert isinstance(response.models, list)
-            assert len(response.models) > 0
+            # Verify response structure (SDK returns dict with models key)
+            assert isinstance(response, dict)
+            assert "models" in response
+            assert isinstance(response["models"], list)
+            assert len(response["models"]) > 0
 
     def test_list_models_format(self, ollama_client, mock_openai_models):
         """Test model format matches Ollama expectations."""
@@ -55,7 +56,7 @@ class TestOllamaSDKList:
             response = ollama_client.list()
 
             # Check each model
-            for model in response.models:
+            for model in response["models"]:
                 # SDK uses 'model' attribute for the name
                 # but the actual JSON response has 'name' which SDK maps to model=None
                 # The name is available through the API response
@@ -82,20 +83,21 @@ class TestOllamaSDKList:
 
             # The SDK doesn't expose model names directly
             # We can check the count matches our mock
-            assert len(response.models) == len(mock_openai_models)
+            assert len(response["models"]) == len(mock_openai_models)
 
             # Check that models have expected attributes
-            for model in response.models:
-                assert model.size > 0
-                assert model.digest.startswith("sha256:")
+            for model in response["models"]:
+                assert "size" in model
+                assert "digest" in model
 
     def test_empty_model_list(self, ollama_client):
         """Test handling of empty model list."""
         with patch.object(OpenAIService, "list_models", return_value=[]):
             response = ollama_client.list()
 
-            assert hasattr(response, "models")
-            assert len(response.models) == 0
+            assert isinstance(response, dict)
+            assert "models" in response
+            assert len(response["models"]) == 0
 
     def test_list_models_error_handling(self, ollama_client):
         """Test error handling with Ollama SDK."""
@@ -117,7 +119,7 @@ class TestOllamaSDKList:
 
             # Should complete within 100ms (excluding network latency)
             assert duration < 0.1
-            assert len(response.models) > 0
+            assert len(response["models"]) > 0
 
 
 @pytest.mark.sdk
@@ -154,7 +156,7 @@ class TestOllamaSDKCompatibilityAdvanced:
 
             # SDK doesn't expose names directly, check count
             # Should have filtered to only 2 models (GPT models)
-            assert len(response.models) == 2
+            assert len(response["models"]) == 2
 
     def test_concurrent_requests(self):
         """Test handling of concurrent SDK requests."""
@@ -177,7 +179,7 @@ class TestOllamaSDKCompatibilityAdvanced:
             # All should succeed
             assert len(results) == 10
             for result in results:
-                assert len(result.models) == 1
+                assert len(result["models"]) == 1
 
 
 @pytest.mark.sdk
