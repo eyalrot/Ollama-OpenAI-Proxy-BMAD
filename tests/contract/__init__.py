@@ -1,1 +1,0 @@
-"""Contract tests for Ollama API compliance."""
