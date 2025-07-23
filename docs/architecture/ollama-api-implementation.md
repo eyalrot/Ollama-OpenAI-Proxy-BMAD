@@ -41,7 +41,7 @@ This service implements the Ollama API specification to maintain compatibility w
    - Look for any special field requirements
 
 2. **During Implementation**:
-   - Use the corrected models in `/src/ollama_openai_proxy/models/ollama_corrected.py`
+   - Use the models in `/src/ollama_openai_proxy/models/ollama.py` (now includes corrections)
    - Implement contract tests first (TDD approach)
    - Validate responses against OpenAPI schema
 

@@ -7,6 +7,7 @@ ruff==0.1.14
 mypy==1.8.0
 pre-commit==3.6.0
 httpx==0.26.0
+jsonschema==4.25.0
 
 # Ollama SDK for compatibility testing
 ollama>=0.1.7

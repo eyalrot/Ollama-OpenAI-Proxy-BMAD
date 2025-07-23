@@ -47,9 +47,7 @@ class TestOllamaAPIContract:
         validator = Draft7Validator(schema, resolver=resolver)
         validator.validate(data)
 
-    def test_tags_response_contract(
-        self, schema_validator: tuple[Dict[str, Any], RefResolver]
-    ) -> None:
+    def test_tags_response_contract(self, schema_validator: tuple[Dict[str, Any], RefResolver]) -> None:
         """Test that /api/tags response matches Ollama's exact format."""
         openapi_spec, resolver = schema_validator
 
@@ -75,9 +73,7 @@ class TestOllamaAPIContract:
         # The error should be about missing 'model' field
         assert "model" in str(exc_info.value)
 
-    def test_correct_tags_format(
-        self, schema_validator: tuple[Dict[str, Any], RefResolver]
-    ) -> None:
+    def test_correct_tags_format(self, schema_validator: tuple[Dict[str, Any], RefResolver]) -> None:
         """Test the correct Ollama format with both name and model fields."""
         openapi_spec, resolver = schema_validator
 
@@ -89,9 +85,7 @@ class TestOllamaAPIContract:
                     "model": "llama3.1:latest",  # DUPLICATE field!
                     "modified_at": "2025-01-21T16:53:57.496699591-08:00",
                     "size": 4920753328,
-                    "digest": (
-                        "sha256:46e0c10c039e019119339687c3c1757" "cc81b9da49709a3b3924863ba87ca666e"
-                    ),
+                    "digest": ("sha256:46e0c10c039e019119339687c3c1757" "cc81b9da49709a3b3924863ba87ca666e"),
                     "details": {
                         "parent_model": "",
                         "format": "gguf",
@@ -171,27 +165,11 @@ class TestOllamaModelCorrection:
     """Test the corrected Ollama model that includes both name and model fields."""
 
     def test_corrected_ollama_model(self) -> None:
-        """Propose a corrected OllamaModel that matches the actual API."""
-        from pydantic import BaseModel, Field
+        """Test that the updated OllamaModel matches the actual API."""
+        from ollama_openai_proxy.models.ollama import OllamaModel
 
-        class OllamaModelCorrected(BaseModel):
-            """Corrected model that matches actual Ollama API."""
-
-            name: str = Field(..., description="Model name/ID")
-            model: str = Field(..., description="Model name/ID (duplicate of name)")
-            modified_at: str = Field(..., description="RFC3339 timestamp with timezone")
-            size: int = Field(..., description="Model size in bytes")
-            digest: str = Field(..., description="Model digest/hash")
-            details: Dict[str, Any] = Field(default_factory=dict, description="Model details")
-
-            def __init__(self, **data: Any) -> None:
-                # Automatically duplicate name to model if not provided
-                if "model" not in data and "name" in data:
-                    data["model"] = data["name"]
-                super().__init__(**data)
-
-        # Test the corrected model
-        model = OllamaModelCorrected(
+        # Test the model with automatic field duplication
+        model = OllamaModel(
             name="gpt-3.5-turbo",
             modified_at="2023-02-28T20:56:42.000000000-08:00",
             size=1500000000,
@@ -216,9 +194,7 @@ def test_sdk_transformation() -> None:
                 "model": "llama3.1:latest",
                 "modified_at": "2025-01-21T16:53:57.496699591-08:00",
                 "size": 4920753328,
-                "digest": (
-                    "sha256:46e0c10c039e019119339687c3c1757" "cc81b9da49709a3b3924863ba87ca666e"
-                ),
+                "digest": ("sha256:46e0c10c039e019119339687c3c1757" "cc81b9da49709a3b3924863ba87ca666e"),
             }
         ]
     }

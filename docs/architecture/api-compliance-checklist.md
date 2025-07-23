@@ -25,9 +25,9 @@ This checklist MUST be completed before implementing any Ollama API endpoint to 
 ## Implementation Checklist
 
 - [ ] **Use Correct Models**
-  - [ ] Import from `/src/ollama_openai_proxy/models/ollama_corrected.py`
-  - [ ] Ensure all required fields are included
-  - [ ] Handle field duplication in model __init__ if needed
+  - [ ] Import from `/src/ollama_openai_proxy/models/ollama.py`
+  - [ ] Ensure all required fields are included (especially duplicate fields!)
+  - [ ] The models now handle field duplication automatically in __init__
   - [ ] Add proper field descriptions and examples
 
 - [ ] **Follow Translation Patterns**
