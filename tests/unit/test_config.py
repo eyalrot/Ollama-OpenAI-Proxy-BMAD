@@ -1,5 +1,8 @@
 """Tests for configuration management."""
+from typing import Any
+
 import pytest
+from fastapi.testclient import TestClient
 from ollama_openai_proxy.config import Settings, get_settings
 from pydantic import ValidationError
 
@@ -7,7 +10,7 @@ from pydantic import ValidationError
 class TestSettings:
     """Test Settings configuration."""
 
-    def test_valid_configuration(self, monkeypatch):
+    def test_valid_configuration(self, monkeypatch: Any) -> None:
         """Test configuration with all valid values."""
         # Set environment variables
         monkeypatch.setenv("OPENAI_API_KEY", "test-key-123")
@@ -27,7 +30,7 @@ class TestSettings:
         assert settings.log_level == "DEBUG"
         assert settings.request_timeout == 600
 
-    def test_missing_api_key(self, monkeypatch):
+    def test_missing_api_key(self, monkeypatch: Any) -> None:
         """Test that missing API key raises error."""
         # Remove API key if set
         monkeypatch.delenv("OPENAI_API_KEY", raising=False)
@@ -41,7 +44,7 @@ class TestSettings:
 
         assert "openai_api_key" in str(exc_info.value)
 
-    def test_invalid_port(self, monkeypatch):
+    def test_invalid_port(self, monkeypatch: Any) -> None:
         """Test invalid port number."""
         monkeypatch.setenv("OPENAI_API_KEY", "test-key")
         monkeypatch.setenv("PROXY_PORT", "99999")
@@ -51,7 +54,7 @@ class TestSettings:
 
         assert "proxy_port" in str(exc_info.value)
 
-    def test_invalid_log_level(self, monkeypatch):
+    def test_invalid_log_level(self, monkeypatch: Any) -> None:
         """Test invalid log level."""
         monkeypatch.setenv("OPENAI_API_KEY", "test-key")
         monkeypatch.setenv("LOG_LEVEL", "INVALID")
@@ -61,7 +64,7 @@ class TestSettings:
 
         assert "log_level" in str(exc_info.value)
 
-    def test_base_url_formatting(self, monkeypatch):
+    def test_base_url_formatting(self, monkeypatch: Any) -> None:
         """Test base URL formatting."""
         monkeypatch.setenv("OPENAI_API_KEY", "test-key")
 
@@ -75,7 +78,7 @@ class TestSettings:
         with pytest.raises(ValidationError):
             Settings()
 
-    def test_env_file_loading(self, tmp_path, monkeypatch):
+    def test_env_file_loading(self, tmp_path: Any, monkeypatch: Any) -> None:
         """Test loading from .env file."""
         # Create temporary .env file
         env_file = tmp_path / ".env"
@@ -101,7 +104,7 @@ LOG_LEVEL=WARNING
         assert settings.proxy_port == 9999
         assert settings.log_level == "WARNING"
 
-    def test_get_settings_caching(self, monkeypatch):
+    def test_get_settings_caching(self, monkeypatch: Any) -> None:
         """Test that get_settings returns cached instance."""
         monkeypatch.setenv("OPENAI_API_KEY", "test-key")
 
@@ -115,7 +118,7 @@ LOG_LEVEL=WARNING
         # Should be the same instance
         assert settings1 is settings2
 
-    def test_helpful_error_message(self, monkeypatch, tmp_path):
+    def test_helpful_error_message(self, monkeypatch: Any, tmp_path: Any) -> None:
         """Test helpful error message for missing API key."""
         monkeypatch.delenv("OPENAI_API_KEY", raising=False)
 
@@ -134,45 +137,33 @@ LOG_LEVEL=WARNING
 class TestConfigurationIntegration:
     """Test configuration integration with FastAPI app."""
 
-    @pytest.mark.asyncio
-    async def test_app_startup_with_valid_config(self, monkeypatch):
+    def test_app_startup_with_valid_config(self, monkeypatch: Any, test_client: TestClient) -> None:
         """Test app starts with valid configuration."""
-        from fastapi.testclient import TestClient
-
         monkeypatch.setenv("OPENAI_API_KEY", "test-key")
 
         # Clear cache
         get_settings.cache_clear()
 
-        # Import app after setting env vars
-        from ollama_openai_proxy.main import app
+        response = test_client.get("/health")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "healthy"
+        assert data["configured"] is True
 
-        with TestClient(app) as client:
-            response = client.get("/health")
-            assert response.status_code == 200
-            data = response.json()
-            assert data["status"] == "healthy"
-            assert data["configured"] is True
-
-    def test_config_validate_endpoint(self, monkeypatch):
+    def test_config_validate_endpoint(self, monkeypatch: Any, test_client: TestClient) -> None:
         """Test configuration validation endpoint."""
-        from fastapi.testclient import TestClient
-
         monkeypatch.setenv("OPENAI_API_KEY", "test-key")
         monkeypatch.setenv("LOG_LEVEL", "DEBUG")
 
         # Clear cache
         get_settings.cache_clear()
 
-        from ollama_openai_proxy.main import app
+        response = test_client.get("/config/validate")
+        assert response.status_code == 200
 
-        with TestClient(app) as client:
-            response = client.get("/config/validate")
-            assert response.status_code == 200
-
-            data = response.json()
-            assert data["status"] == "valid"
-            assert data["config"]["log_level"] == "DEBUG"
-            assert data["config"]["api_key_configured"] is True
-            # Should not expose actual API key
-            assert "openai_api_key" not in data["config"]
+        data = response.json()
+        assert data["status"] == "valid"
+        assert data["config"]["log_level"] == "DEBUG"
+        assert data["config"]["api_key_configured"] is True
+        # Should not expose actual API key
+        assert "openai_api_key" not in data["config"]
