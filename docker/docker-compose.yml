@@ -1,0 +1,15 @@
+version: '3.8'
+
+services:
+  proxy:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    ports:
+      - "11434:11434"
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+    volumes:
+      - ../src:/app/src  # Hot reload for development
+    restart: unless-stopped
