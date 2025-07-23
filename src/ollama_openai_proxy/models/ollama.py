@@ -285,6 +285,32 @@ class OllamaChatResponse(BaseModel):
     )
 
 
+class OllamaEmbeddingsRequest(BaseModel):
+    """Request format for /api/embeddings and /api/embed endpoints."""
+
+    model: str = Field(..., description="Model name/ID to use for embeddings")
+    prompt: str = Field(..., description="Text to generate embeddings for")
+    options: Optional[Dict[str, Any]] = Field(default=None, description="Model parameters")
+    keep_alive: Optional[str] = Field(default=None, description="How long to keep model loaded")
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "model": "llama2",
+                "prompt": "Here is some text to embed",
+            }
+        }
+    )
+
+
+class OllamaEmbeddingsResponse(BaseModel):
+    """Response format for /api/embeddings and /api/embed endpoints."""
+
+    embedding: List[float] = Field(..., description="Array of embedding values")
+
+    model_config = ConfigDict(json_schema_extra={"example": {"embedding": [0.1, 0.2, 0.3, -0.4, 0.5]}})
+
+
 class OllamaChatStreamChunk(BaseModel):
     """Response format for /api/chat endpoint (streaming chunk)."""
 
