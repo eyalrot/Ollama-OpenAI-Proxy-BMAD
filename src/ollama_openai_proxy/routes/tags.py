@@ -9,7 +9,7 @@ from fastapi.responses import JSONResponse
 from ..config import Settings
 from ..models.ollama import OllamaError, OllamaTagsResponse
 from ..services.openai_service import OpenAIService
-from ..services.translation_service import TranslationService
+from ..services.enhanced_translation_service import EnhancedTranslationService
 
 logger = logging.getLogger(__name__)
 
@@ -72,8 +72,11 @@ async def list_models(
         # Fetch models from OpenAI
         openai_models = await openai_service.list_models()
         
-        # Translate to Ollama format
-        ollama_response = TranslationService.translate_model_list(openai_models)
+        # Translate to Ollama format using enhanced service
+        ollama_response = EnhancedTranslationService.translate_with_metadata(
+            openai_models,
+            include_metadata=False  # Keep response lean for now
+        )
         
         # Add cache headers to reduce API calls
         response.headers["Cache-Control"] = "public, max-age=300"  # Cache for 5 minutes
