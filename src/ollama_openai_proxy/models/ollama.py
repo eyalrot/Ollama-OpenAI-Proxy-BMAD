@@ -86,6 +86,40 @@ class OllamaError(BaseModel):
     model_config = ConfigDict(json_schema_extra={"example": {"error": "model not found"}})
 
 
+class OllamaErrorDetails(BaseModel):
+    """Detailed error information."""
+
+    message: str = Field(..., description="Human-readable error message")
+    type: str = Field(..., description="Error type identifier")
+    code: Optional[int] = Field(default=None, description="HTTP status code")
+    details: Optional[Dict[str, Any]] = Field(default=None, description="Additional error details")
+
+
+class OllamaErrorResponse(BaseModel):
+    """Enhanced error response with correlation ID and metadata."""
+
+    error: OllamaErrorDetails = Field(..., description="Error details")
+    correlation_id: Optional[str] = Field(default=None, description="Request correlation ID for debugging")
+    model: Optional[str] = Field(default=None, description="Model that was requested")
+    created_at: Optional[str] = Field(default=None, description="RFC3339 timestamp")
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "error": {
+                    "message": "Rate limit exceeded",
+                    "type": "rate_limit_error",
+                    "code": 429,
+                    "details": {"retry_after": 60},
+                },
+                "correlation_id": "req_12345",
+                "model": "llama2",
+                "created_at": "2023-08-04T19:56:02.647Z",
+            }
+        }
+    )
+
+
 class OllamaGenerateRequest(BaseModel):
     """Request format for /api/generate endpoint."""
 
