@@ -1,14 +1,14 @@
 # Epic 1: Foundation & Core Translation (Enhanced Draft)
 
-## Epic Status: In Progress (57% Complete)
+## Epic Status: In Progress (86% Complete)
 
 ### Story Progress:
 - ✅ **Story 1.1: Project Foundation and Structure** - Complete
 - ✅ **Story 1.2: Configuration Management** - Complete
 - ✅ **Story 1.3: OpenAI SDK Client Wrapper** - Complete
 - ✅ **Story 1.4: Implement /api/tags Endpoint** - Complete
-- 🔄 **Story 1.5: Translation Engine for Model Listing** - Next
-- ⏳ **Story 1.6: Testing Infrastructure Setup** - Pending
+- ✅ **Story 1.5: Translation Engine for Model Listing** - Complete
+- ✅ **Story 1.6: Testing Infrastructure Setup** - Complete
 - ⏳ **Story 1.7: Ollama SDK Compatibility Test Suite** - Pending
 
 ### Key Achievements:

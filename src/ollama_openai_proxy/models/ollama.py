@@ -2,7 +2,7 @@
 from datetime import datetime
 from typing import List, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 
 
 class OllamaModel(BaseModel):
@@ -13,9 +13,8 @@ class OllamaModel(BaseModel):
     size: int = Field(..., description="Model size in bytes")
     digest: Optional[str] = Field(default="", description="Model digest/hash")
     
-    class Config:
-        """Pydantic configuration."""
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "name": "gpt-3.5-turbo",
                 "modified_at": "2024-01-20T10:30:00Z",
@@ -23,6 +22,7 @@ class OllamaModel(BaseModel):
                 "digest": "sha256:abcdef123456"
             }
         }
+    )
 
 
 class OllamaTagsResponse(BaseModel):
@@ -33,9 +33,8 @@ class OllamaTagsResponse(BaseModel):
         description="List of available models"
     )
     
-    class Config:
-        """Pydantic configuration."""
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "models": [
                     {
@@ -51,6 +50,7 @@ class OllamaTagsResponse(BaseModel):
                 ]
             }
         }
+    )
 
 
 class OllamaError(BaseModel):
@@ -58,10 +58,10 @@ class OllamaError(BaseModel):
     
     error: str = Field(..., description="Error message")
     
-    class Config:
-        """Pydantic configuration."""
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "error": "model not found"
             }
         }
+    )

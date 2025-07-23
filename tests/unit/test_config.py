@@ -37,8 +37,9 @@ class TestSettings:
         # Clear LRU cache
         get_settings.cache_clear()
         
+        # Create Settings without loading from .env file
         with pytest.raises(ValidationError) as exc_info:
-            Settings()
+            Settings(_env_file=None)
         
         assert "openai_api_key" in str(exc_info.value)
     
@@ -114,9 +115,12 @@ LOG_LEVEL=WARNING
         # Should be the same instance
         assert settings1 is settings2
     
-    def test_helpful_error_message(self, monkeypatch):
+    def test_helpful_error_message(self, monkeypatch, tmp_path):
         """Test helpful error message for missing API key."""
         monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+        
+        # Change to a directory without .env file
+        monkeypatch.chdir(tmp_path)
         
         # Clear cache
         get_settings.cache_clear()
@@ -150,8 +154,7 @@ class TestConfigurationIntegration:
             assert data["status"] == "healthy"
             assert data["configured"] is True
     
-    @pytest.mark.asyncio
-    async def test_config_validate_endpoint(self, monkeypatch):
+    def test_config_validate_endpoint(self, monkeypatch):
         """Test configuration validation endpoint."""
         from fastapi.testclient import TestClient
         
