@@ -27,9 +27,7 @@ class OpenAPIValidator:
         # Create resolver for $ref references
         self.resolver = RefResolver(base_uri=f"file://{self.spec_path.parent}/", referrer=self.spec)
 
-    def get_response_schema(
-        self, path: str, method: str, status_code: int = 200
-    ) -> Optional[Dict[str, Any]]:
+    def get_response_schema(self, path: str, method: str, status_code: int = 200) -> Optional[Dict[str, Any]]:
         """Get response schema for a specific endpoint."""
         path_spec = self.spec.get("paths", {}).get(path)
         if not path_spec:
@@ -46,9 +44,7 @@ class OpenAPIValidator:
         content = response_spec.get("content", {}).get("application/json", {})
         return content.get("schema")  # type: ignore[no-any-return]
 
-    def validate_response(
-        self, path: str, method: str, response_data: Any, status_code: int = 200
-    ) -> bool:
+    def validate_response(self, path: str, method: str, response_data: Any, status_code: int = 200) -> bool:
         """Validate response data against schema."""
         schema = self.get_response_schema(path, method, status_code)
         if not schema:
