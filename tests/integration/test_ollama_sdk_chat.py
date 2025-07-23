@@ -2,6 +2,7 @@
 import json
 import os
 import subprocess
+import sys
 import time
 from typing import Generator
 
@@ -20,8 +21,19 @@ STARTUP_TIMEOUT = 30  # seconds to wait for server startup
 
 
 @pytest.fixture(scope="module")
-def server_process() -> Generator[subprocess.Popen, None, None]:
-    """Start the proxy server for testing."""
+def server_process() -> Generator[subprocess.Popen | None, None, None]:
+    """Start the proxy server for testing if not already running."""
+    # Check if server is already running (e.g., in CI)
+    try:
+        response = requests.get(f"{SERVER_HOST}/health", timeout=1)
+        if response.status_code == 200:
+            # Server is already running
+            yield None
+            return
+    except requests.exceptions.RequestException:
+        pass
+
+    # Server not running, start it
     # Set up environment variables
     env = os.environ.copy()
     env["OPENAI_API_KEY"] = os.getenv("OPENAI_API_KEY", "test-key")
@@ -29,10 +41,9 @@ def server_process() -> Generator[subprocess.Popen, None, None]:
     env["PROXY_PORT"] = "11434"
     env["LOG_LEVEL"] = "INFO"
 
-    # Start the server using the virtual environment's Python
-    python_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "venv", "bin", "python")
+    # Start the server using the current Python interpreter
     process = subprocess.Popen(
-        [python_path, "-m", "ollama_openai_proxy.main"],
+        [sys.executable, "-m", "ollama_openai_proxy.main"],
         env=env,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
