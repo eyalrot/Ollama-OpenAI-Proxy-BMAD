@@ -322,5 +322,19 @@ class TestOllamaSDKEmbeddingsIntegration:
         assert response2.status_code == 200
         data2 = response2.json()
 
-        # Verify identical responses
-        assert data1["embedding"] == data2["embedding"]
+        # Verify responses are very similar (OpenAI may return slightly different values)
+        # Calculate cosine similarity between embeddings
+        embedding1 = data1["embedding"]
+        embedding2 = data2["embedding"]
+
+        # Ensure same dimensions
+        assert len(embedding1) == len(embedding2)
+
+        # Calculate cosine similarity
+        dot_product = sum(a * b for a, b in zip(embedding1, embedding2, strict=False))
+        magnitude1 = sum(a**2 for a in embedding1) ** 0.5
+        magnitude2 = sum(b**2 for b in embedding2) ** 0.5
+        cosine_similarity = dot_product / (magnitude1 * magnitude2)
+
+        # Embeddings should be nearly identical (cosine similarity > 0.9999)
+        assert cosine_similarity > 0.9999, f"Embeddings are not similar enough: {cosine_similarity}"
