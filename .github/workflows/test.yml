@@ -74,6 +74,7 @@ jobs:
         coverage report --fail-under=60
     
     - name: Upload coverage to Codecov
+      if: ${{ secrets.CODECOV_TOKEN != '' }}
       uses: codecov/codecov-action@v3
       with:
         file: ./coverage.xml
