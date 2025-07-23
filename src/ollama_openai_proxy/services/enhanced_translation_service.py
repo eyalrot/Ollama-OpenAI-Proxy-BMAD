@@ -409,18 +409,18 @@ class EnhancedTranslationService(TranslationService):
         # Build messages array - direct mapping since Ollama uses same format as OpenAI
         messages = []
         for msg in request.messages:
-            message = {"role": msg.role, "content": msg.content}
+            message: Dict[str, Any] = {"role": msg.role, "content": msg.content}
             # Add images if present (for multimodal models)
             if msg.images:
                 message["images"] = msg.images
             messages.append(message)
 
         # Build OpenAI request
-        openai_request = {
+        openai_request: Dict[str, Any] = {
             "model": request.model,
             "messages": messages,
         }
-        
+
         # Only add stream for non-streaming calls
         # (streaming calls use create_chat_completion_stream which sets stream=True)
         if not request.stream:
@@ -504,9 +504,7 @@ class EnhancedTranslationService(TranslationService):
 
         return response
 
-    async def translate_chat_stream_chunk(
-        self, openai_chunk: ChatCompletionChunk, model: str
-    ) -> OllamaChatStreamChunk:
+    async def translate_chat_stream_chunk(self, openai_chunk: ChatCompletionChunk, model: str) -> OllamaChatStreamChunk:
         """
         Translate OpenAI streaming chunk to Ollama chat stream chunk.
 

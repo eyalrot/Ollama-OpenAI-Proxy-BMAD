@@ -1,18 +1,18 @@
 repos:
-  # Temporarily disabled to speed up development
-  # - repo: https://github.com/astral-sh/ruff-pre-commit
-  #   rev: v0.1.14
-  #   hooks:
-  #     - id: ruff
-  #       args: [--fix, --exit-non-zero-on-fix]
-  #     - id: ruff-format
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.1.14
+    hooks:
+      - id: ruff
+        args: [--fix, --exit-non-zero-on-fix]
+      - id: ruff-format
 
-  # - repo: https://github.com/pre-commit/mirrors-mypy
-  #   rev: v1.8.0
-  #   hooks:
-  #     - id: mypy
-  #       additional_dependencies: [pydantic, fastapi, httpx]
-  #       args: [--ignore-missing-imports]
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.8.0
+    hooks:
+      - id: mypy
+        additional_dependencies: [pydantic, fastapi, httpx, types-PyYAML, types-requests]
+        args: [--ignore-missing-imports]
+        files: ^src/
 
   - repo: local
     hooks:
