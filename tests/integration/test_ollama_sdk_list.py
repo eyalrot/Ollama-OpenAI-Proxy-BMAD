@@ -27,9 +27,9 @@ class TestOllamaSDKIntegration:
         """Test that we can connect to the proxy server."""
         try:
             response = ollama_client.list()
-            # If we get here, the connection works
-            assert isinstance(response, dict)
-            assert "models" in response
+            # If we get here, the connection works (new ollama 0.5+ format)
+            assert hasattr(response, "models")
+            assert isinstance(response.models, list)
         except Exception as e:
             pytest.fail(f"Cannot connect to proxy server: {e}")
 
@@ -37,25 +37,25 @@ class TestOllamaSDKIntegration:
         """Test model listing against our proxy server."""
         response = ollama_client.list()
 
-        # Verify response structure
-        assert isinstance(response, dict)
-        assert "models" in response
-        assert isinstance(response["models"], list)
+        # Verify response structure (new ollama 0.5+ format)
+        assert hasattr(response, "models")
+        assert isinstance(response.models, list)
 
         # Our proxy translates OpenAI models to Ollama format
         # With valid API key, should return OpenAI models
-        print(f"Found {len(response['models'])} models from OpenAI via proxy")
+        print(f"Found {len(response.models)} models from OpenAI via proxy")
 
     def test_model_format_real_server(self, ollama_client: Any) -> None:
         """Test that model format matches Ollama SDK expectations."""
         response = ollama_client.list()
 
-        if len(response["models"]) > 0:
-            for model in response["models"]:
-                # Each model should have these attributes
+        if len(response.models) > 0:
+            for model in response.models:
+                # Each model should have these attributes (new ollama 0.5+ format)
                 assert hasattr(model, "modified_at")
                 assert hasattr(model, "size")
                 assert hasattr(model, "digest")
+                assert hasattr(model, "model")
 
                 # Type checks
                 assert isinstance(model.modified_at, datetime)
@@ -78,7 +78,7 @@ class TestOllamaSDKIntegration:
 
         # Should complete within reasonable time (including OpenAI API call)
         assert duration < 10.0  # 10 seconds max for OpenAI API call
-        assert isinstance(response, dict)
+        assert hasattr(response, "models")
 
         print(f"Response time: {duration*1000:.2f}ms")
 
@@ -104,13 +104,13 @@ class TestOllamaSDKIntegration:
         # All requests should succeed
         assert len(results) == 5
         for result in results:
-            assert isinstance(result, dict)
-            assert "models" in result
+            assert hasattr(result, "models")
+            assert isinstance(result.models, list)
 
     def test_error_handling_real_server(self, ollama_client: Any) -> None:
         """Test error handling with invalid endpoints."""
         # Test with invalid client to trigger error
-        invalid_client = ollama.Client(host="http://localhost:99999")
+        invalid_client = ollama.Client(host="http://localhost:9999")
 
         with pytest.raises((ConnectionError, OSError, Exception)):
             invalid_client.list()
@@ -172,12 +172,12 @@ class TestOllamaSDKWithRealAPI:
         response = client.list()
 
         # Should have models from OpenAI
-        assert len(response["models"]) > 0
+        assert len(response.models) > 0
 
-        print(f"Real API returned {len(response['models'])} models")
+        print(f"Real API returned {len(response.models)} models")
 
         # Verify format
-        for model in response["models"]:
+        for model in response.models:
             assert hasattr(model, "modified_at")
             assert hasattr(model, "size")
             assert hasattr(model, "digest")
