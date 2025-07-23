@@ -204,3 +204,110 @@ class OllamaGenerateStreamChunk(BaseModel):
             "example": {"model": "llama2", "created_at": "2023-08-04T19:56:02.647Z", "response": "The", "done": False}
         }
     )
+
+
+class OllamaChatMessage(BaseModel):
+    """Chat message format."""
+
+    role: str = Field(..., description="Message role: 'system', 'user', or 'assistant'")
+    content: str = Field(..., description="Message content")
+    images: Optional[List[str]] = Field(default=None, description="Base64 encoded images for multimodal models")
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "role": "user",
+                "content": "Hello, how are you?",
+            }
+        }
+    )
+
+
+class OllamaChatRequest(BaseModel):
+    """Request format for /api/chat endpoint."""
+
+    model: str = Field(..., description="Model name/ID to use for chat")
+    messages: List[OllamaChatMessage] = Field(..., description="Array of message objects")
+    stream: Optional[bool] = Field(default=True, description="Whether to stream the response")
+    format: Optional[str] = Field(default=None, description="Output format (e.g., 'json')")
+    options: Optional[Dict[str, Any]] = Field(default=None, description="Model parameters")
+    keep_alive: Optional[str] = Field(default=None, description="How long to keep model loaded")
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "model": "llama2",
+                "messages": [
+                    {"role": "system", "content": "You are a helpful assistant."},
+                    {"role": "user", "content": "Hello!"},
+                ],
+                "stream": False,
+                "options": {"temperature": 0.7},
+            }
+        }
+    )
+
+
+class OllamaChatResponse(BaseModel):
+    """Response format for /api/chat endpoint (non-streaming)."""
+
+    model: str = Field(..., description="Model used for chat")
+    created_at: str = Field(..., description="RFC3339 timestamp with timezone")
+    message: OllamaChatMessage = Field(..., description="Assistant's response message")
+    done: bool = Field(..., description="Whether response is complete")
+    done_reason: Optional[str] = Field(default=None, description="Reason for completion: 'stop', 'length', or 'load'")
+    total_duration: Optional[int] = Field(default=None, description="Total time in nanoseconds")
+    load_duration: Optional[int] = Field(default=None, description="Model load time in nanoseconds")
+    prompt_eval_count: Optional[int] = Field(default=None, description="Number of tokens in prompt")
+    prompt_eval_duration: Optional[int] = Field(default=None, description="Time to evaluate prompt in nanoseconds")
+    eval_count: Optional[int] = Field(default=None, description="Number of tokens generated")
+    eval_duration: Optional[int] = Field(default=None, description="Time to generate response in nanoseconds")
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "model": "llama2",
+                "created_at": "2023-08-04T19:56:02.647Z",
+                "message": {
+                    "role": "assistant",
+                    "content": "Hello! How can I help you today?",
+                },
+                "done": True,
+                "done_reason": "stop",
+                "total_duration": 1234567890,
+                "load_duration": 123456789,
+                "prompt_eval_count": 45,
+                "prompt_eval_duration": 234567890,
+                "eval_count": 120,
+                "eval_duration": 890123456,
+            }
+        }
+    )
+
+
+class OllamaChatStreamChunk(BaseModel):
+    """Response format for /api/chat endpoint (streaming chunk)."""
+
+    model: str = Field(..., description="Model used for chat")
+    created_at: str = Field(..., description="RFC3339 timestamp with timezone")
+    message: OllamaChatMessage = Field(..., description="Partial message with accumulated content")
+    done: bool = Field(..., description="Whether response is complete")
+    # These fields are only present in the final chunk when done=True
+    done_reason: Optional[str] = Field(default=None, description="Reason for completion (final chunk only)")
+    total_duration: Optional[int] = Field(default=None, description="Total time (final chunk only)")
+    load_duration: Optional[int] = Field(default=None, description="Model load time (final chunk only)")
+    prompt_eval_count: Optional[int] = Field(default=None, description="Prompt token count (final chunk only)")
+    prompt_eval_duration: Optional[int] = Field(default=None, description="Prompt eval time (final chunk only)")
+    eval_count: Optional[int] = Field(default=None, description="Generated token count (final chunk only)")
+    eval_duration: Optional[int] = Field(default=None, description="Generation time (final chunk only)")
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "model": "llama2",
+                "created_at": "2023-08-04T19:56:02.647Z",
+                "message": {"role": "assistant", "content": "Hello"},
+                "done": False,
+            }
+        }
+    )

@@ -8,6 +8,10 @@ from openai.types import Model
 from openai.types.chat import ChatCompletion, ChatCompletionChunk
 
 from ..models.ollama import (
+    OllamaChatMessage,
+    OllamaChatRequest,
+    OllamaChatResponse,
+    OllamaChatStreamChunk,
     OllamaGenerateRequest,
     OllamaGenerateResponse,
     OllamaGenerateStreamChunk,
@@ -389,5 +393,156 @@ class EnhancedTranslationService(TranslationService):
 
         if done and finish_reason:
             chunk.done_reason = finish_reason
+
+        return chunk
+
+    async def translate_chat_request(self, request: OllamaChatRequest) -> Dict[str, Any]:
+        """
+        Translate Ollama chat request to OpenAI chat completion format.
+
+        Args:
+            request: Ollama chat request
+
+        Returns:
+            Dict with OpenAI chat completion parameters
+        """
+        # Build messages array - direct mapping since Ollama uses same format as OpenAI
+        messages = []
+        for msg in request.messages:
+            message = {"role": msg.role, "content": msg.content}
+            # Add images if present (for multimodal models)
+            if msg.images:
+                message["images"] = msg.images
+            messages.append(message)
+
+        # Build OpenAI request
+        openai_request = {
+            "model": request.model,
+            "messages": messages,
+            "stream": request.stream,
+        }
+
+        # Map Ollama options to OpenAI parameters if provided
+        if request.options:
+            options = request.options
+            if "temperature" in options:
+                openai_request["temperature"] = options["temperature"]
+            if "top_p" in options:
+                openai_request["top_p"] = options["top_p"]
+            if "max_tokens" in options or "num_predict" in options:
+                openai_request["max_tokens"] = options.get("max_tokens", options.get("num_predict"))
+            if "stop" in options:
+                openai_request["stop"] = options["stop"]
+            if "frequency_penalty" in options:
+                openai_request["frequency_penalty"] = options["frequency_penalty"]
+            if "presence_penalty" in options:
+                openai_request["presence_penalty"] = options["presence_penalty"]
+            if "seed" in options:
+                openai_request["seed"] = options["seed"]
+
+        # Add format if specified (for JSON mode)
+        if request.format:
+            if request.format == "json":
+                openai_request["response_format"] = {"type": "json_object"}
+
+        logger.debug(f"Translated chat request: {openai_request}")
+        return openai_request
+
+    async def translate_chat_response(self, openai_response: ChatCompletion, model: str) -> OllamaChatResponse:
+        """
+        Translate OpenAI chat completion to Ollama chat response.
+
+        Args:
+            openai_response: OpenAI chat completion
+            model: Original model name from request
+
+        Returns:
+            OllamaChatResponse
+        """
+        # Extract the assistant message
+        message = OllamaChatMessage(role="assistant", content="")
+        finish_reason = "stop"
+
+        if openai_response.choices:
+            choice = openai_response.choices[0]
+            if choice.message:
+                message.role = choice.message.role
+                message.content = choice.message.content or ""
+            if choice.finish_reason:
+                finish_reason = choice.finish_reason
+
+        # Map finish reason
+        done_reason = "stop"
+        if finish_reason == "length":
+            done_reason = "length"
+        elif finish_reason == "content_filter":
+            done_reason = "stop"
+
+        # Build response
+        response = OllamaChatResponse(
+            model=model,
+            created_at=datetime.now(timezone.utc).isoformat(),
+            message=message,
+            done=True,
+            done_reason=done_reason,
+        )
+
+        # Add performance metrics if available
+        if openai_response.usage:
+            response.prompt_eval_count = openai_response.usage.prompt_tokens
+            response.eval_count = openai_response.usage.completion_tokens
+            # Estimate durations (OpenAI doesn't provide timing info)
+            if response.prompt_eval_count:
+                response.prompt_eval_duration = response.prompt_eval_count * 1_000_000  # 1ms per token estimate
+            if response.eval_count:
+                response.eval_duration = response.eval_count * 10_000_000  # 10ms per token estimate
+            response.total_duration = (response.prompt_eval_duration or 0) + (response.eval_duration or 0)
+
+        return response
+
+    async def translate_chat_stream_chunk(
+        self, openai_chunk: ChatCompletionChunk, model: str
+    ) -> OllamaChatStreamChunk:
+        """
+        Translate OpenAI streaming chunk to Ollama chat stream chunk.
+
+        Args:
+            openai_chunk: OpenAI chat completion chunk
+            model: Original model name from request
+
+        Returns:
+            OllamaChatStreamChunk
+        """
+        # Extract content from chunk
+        content = ""
+        role = "assistant"
+        done = False
+        finish_reason = None
+
+        if openai_chunk.choices:
+            choice = openai_chunk.choices[0]
+            if choice.delta:
+                if choice.delta.content:
+                    content = choice.delta.content
+                if choice.delta.role:
+                    role = choice.delta.role
+            if choice.finish_reason:
+                finish_reason = choice.finish_reason
+                done = True
+
+        # Create message with accumulated content
+        message = OllamaChatMessage(role=role, content=content)
+
+        # Build chunk
+        chunk = OllamaChatStreamChunk(
+            model=model,
+            created_at=datetime.now(timezone.utc).isoformat(),
+            message=message,
+            done=done,
+        )
+
+        # Add done_reason if this is the final chunk
+        if done and finish_reason:
+            chunk.done_reason = "stop" if finish_reason == "stop" else "length"
 
         return chunk

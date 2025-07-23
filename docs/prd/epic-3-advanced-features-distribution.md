@@ -1,5 +1,7 @@
 # Epic 3: Advanced Features & Distribution
 
+**⚠️ CRITICAL: All Python activities including running unit tests, integration tests, and any Python commands MUST be executed inside the virtual environment (venv). Always activate the virtual environment first with `source venv/bin/activate` before running any Python-related commands.**
+
 Complete the proxy implementation with chat and embeddings support, then package for distribution. This epic delivers the remaining Ollama SDK functionality and makes the service easily deployable through multiple channels. By the end, users have a production-ready proxy service available via Docker, PyPI, or direct installation.
 
 ## Story 3.1: Implement /api/chat Endpoint

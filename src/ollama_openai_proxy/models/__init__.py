@@ -1,5 +1,9 @@
 """Data models for Ollama API compatibility."""
 from .ollama import (
+    OllamaChatMessage,
+    OllamaChatRequest,
+    OllamaChatResponse,
+    OllamaChatStreamChunk,
     OllamaError,
     OllamaGenerateRequest,
     OllamaGenerateResponse,
@@ -9,6 +13,10 @@ from .ollama import (
 )
 
 __all__ = [
+    "OllamaChatMessage",
+    "OllamaChatRequest",
+    "OllamaChatResponse",
+    "OllamaChatStreamChunk",
     "OllamaError",
     "OllamaGenerateRequest",
     "OllamaGenerateResponse",
