@@ -4,7 +4,7 @@ import logging
 from datetime import datetime, timezone
 from typing import Any, ClassVar, Dict, List, Optional, Set
 
-from openai.types import Model
+from openai.types import CreateEmbeddingResponse, Model
 from openai.types.chat import ChatCompletion, ChatCompletionChunk
 
 from ..models.ollama import (
@@ -12,6 +12,8 @@ from ..models.ollama import (
     OllamaChatRequest,
     OllamaChatResponse,
     OllamaChatStreamChunk,
+    OllamaEmbeddingsRequest,
+    OllamaEmbeddingsResponse,
     OllamaGenerateRequest,
     OllamaGenerateResponse,
     OllamaGenerateStreamChunk,
@@ -548,3 +550,50 @@ class EnhancedTranslationService(TranslationService):
             chunk.done_reason = "stop" if finish_reason == "stop" else "length"
 
         return chunk
+
+    async def translate_embeddings_request(self, request: OllamaEmbeddingsRequest) -> Dict[str, Any]:
+        """
+        Translate Ollama embeddings request to OpenAI embeddings format.
+
+        Args:
+            request: Ollama embeddings request
+
+        Returns:
+            Dict with OpenAI embeddings parameters
+        """
+        # Build OpenAI request
+        openai_request: Dict[str, Any] = {
+            "model": request.model,
+            "input": request.prompt,  # Ollama uses 'prompt', OpenAI uses 'input'
+        }
+
+        # Note: Ollama embeddings don't support additional options like encoding_format
+        # in the current API specification
+
+        logger.debug(f"Translated embeddings request: {request.model} with prompt length {len(request.prompt)}")
+
+        return openai_request
+
+    async def translate_embeddings_response(self, openai_response: CreateEmbeddingResponse) -> OllamaEmbeddingsResponse:
+        """
+        Translate OpenAI embeddings response to Ollama embeddings format.
+
+        Args:
+            openai_response: OpenAI embeddings response
+
+        Returns:
+            OllamaEmbeddingsResponse
+        """
+        # Extract the embedding array
+        embedding = []
+
+        if openai_response.data and len(openai_response.data) > 0:
+            # OpenAI returns data[0].embedding, Ollama expects just the array
+            embedding = openai_response.data[0].embedding
+
+        # Create Ollama response with just the embedding array
+        ollama_response = OllamaEmbeddingsResponse(embedding=embedding)
+
+        logger.debug(f"Translated embeddings response with {len(embedding)} dimensions")
+
+        return ollama_response

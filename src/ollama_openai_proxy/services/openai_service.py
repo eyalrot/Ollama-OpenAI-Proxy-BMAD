@@ -7,7 +7,15 @@ from contextlib import asynccontextmanager
 from typing import Any, AsyncIterator, Callable, Dict, List, Optional, cast
 
 import httpx
-from openai import APIError, APITimeoutError, AsyncOpenAI, RateLimitError
+from openai import (
+    APIError,
+    APITimeoutError,
+    AsyncOpenAI,
+    AuthenticationError,
+    BadRequestError,
+    NotFoundError,
+    RateLimitError,
+)
 from openai.types import Model
 from openai.types.chat import ChatCompletion, ChatCompletionChunk
 from openai.types.create_embedding_response import CreateEmbeddingResponse
@@ -171,7 +179,13 @@ class OpenAIService:
                     # No more retries or non-retryable error
                     error_msg = f"Failed to {operation} after {attempt + 1} attempts: {e!s}"
                     logger.error(error_msg, extra={"request_id": request_id, "final_error": True})
-                    raise OpenAIError(error_msg) from e
+
+                    # Preserve specific OpenAI error types that should not be wrapped
+                    # These are errors with specific HTTP status codes that need to be propagated
+                    if isinstance(e, (NotFoundError, AuthenticationError, BadRequestError, RateLimitError)):
+                        raise
+                    else:
+                        raise OpenAIError(error_msg) from e
 
         # Should never reach here
         raise OpenAIError(f"Unexpected error in {operation}")
@@ -261,7 +275,12 @@ class OpenAIService:
 
         except Exception as e:
             logger.error("Error in streaming chat completion", extra={"request_id": request_id, "error": str(e)})
-            raise OpenAIError(f"Streaming error: {e!s}") from e
+            # Preserve specific OpenAI error types that should not be wrapped
+            # These are errors with specific HTTP status codes that need to be propagated
+            if isinstance(e, (NotFoundError, AuthenticationError, BadRequestError, RateLimitError)):
+                raise
+            else:
+                raise OpenAIError(f"Streaming error: {e!s}") from e
 
     async def create_embedding(self, model: str, input: str, **kwargs: Any) -> CreateEmbeddingResponse:
         """
