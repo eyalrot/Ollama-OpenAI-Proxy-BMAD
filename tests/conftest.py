@@ -2,7 +2,7 @@
 import asyncio
 import os
 import sys
-from typing import Any
+from typing import Any, AsyncGenerator, Generator
 from unittest.mock import AsyncMock, MagicMock
 
 # Add src to path for imports
@@ -39,18 +39,22 @@ def mock_settings() -> Any:
 
 
 @pytest.fixture
-def test_client() -> TestClient:
+def test_client(mock_openai_service: Any) -> Generator[TestClient, None, None]:
     """Create FastAPI test client."""
     # Clear settings cache
     get_settings.cache_clear()
 
     # Create test client
-    with TestClient(app) as client:
-        yield client
+    client = TestClient(app)
+
+    # Set up mock OpenAI service
+    app.state.openai_service = mock_openai_service
+
+    yield client
 
 
 @pytest_asyncio.fixture
-async def async_client():
+async def async_client() -> AsyncGenerator[AsyncClient, None]:
     """Create async test client."""
     async with AsyncClient(app=app, base_url="http://test") as client:
         yield client
@@ -133,7 +137,7 @@ def mock_openai_streaming() -> Any:
     from openai.types.chat import ChatCompletionChunk
     from openai.types.chat.chat_completion_chunk import Choice, ChoiceDelta
 
-    async def stream_generator():
+    async def stream_generator() -> AsyncGenerator[Any, None]:
         chunks = [
             ChatCompletionChunk(
                 id="chatcmpl-test123",
@@ -179,7 +183,7 @@ def mock_openai_streaming() -> Any:
 
 
 @pytest.fixture(autouse=True)
-def reset_app_state() -> None:
+def reset_app_state() -> Generator[None, None, None]:
     """Reset app state between tests."""
     # Clear any existing state
     if hasattr(app.state, "settings"):
