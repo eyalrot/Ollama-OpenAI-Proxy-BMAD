@@ -54,7 +54,7 @@ jobs:
         pytest tests/integration -v -m "not requires_api_key"
     
     - name: Run integration tests (with API key)
-      if: secrets.OPENAI_API_KEY != ''
+      if: ${{ secrets.OPENAI_API_KEY }}
       run: |
         pytest tests/integration -v -m "requires_api_key"
     
