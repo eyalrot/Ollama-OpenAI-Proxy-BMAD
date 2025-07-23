@@ -7,7 +7,7 @@ This directory contains detailed implementation cards for each story in Epic 1: 
 | Story | Title | Points | Dependencies | Status |
 |-------|-------|--------|--------------|--------|
 | 1.1 | [Project Foundation and Structure](story-1.1-project-foundation.md) | 3 | None | ✅ Completed |
-| 1.2 | [Configuration Management](story-1.2-configuration-management.md) | 2 | 1.1 | 🔲 Not Started |
+| 1.2 | [Configuration Management](story-1.2-configuration-management.md) | 2 | 1.1 | ✅ Completed |
 | 1.3 | [OpenAI SDK Client Wrapper](story-1.3-openai-client-wrapper.md) | 3 | 1.2 | 🔲 Not Started |
 | 1.4 | [Implement /api/tags Endpoint](story-1.4-api-tags-endpoint.md) | 3 | 1.1, 1.2, 1.3 | 🔲 Not Started |
 | 1.5 | [Translation Engine for Model Listing](story-1.5-translation-engine.md) | 2 | 1.4 started | 🔲 Not Started |

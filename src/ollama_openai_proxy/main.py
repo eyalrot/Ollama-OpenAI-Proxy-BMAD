@@ -3,28 +3,62 @@ import logging
 import sys
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.responses import JSONResponse
 
-# Configure JSON logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='{"time": "%(asctime)s", "level": "%(levelname)s", "message": "%(message)s"}',
-    handlers=[logging.StreamHandler(sys.stdout)]
-)
+from .config import get_settings
+from .exceptions import ConfigurationError
+
+# Will be configured after settings are loaded
 logger = logging.getLogger(__name__)
 
 __version__ = "0.1.0"
 
 
+def configure_logging(log_level: str) -> None:
+    """Configure application logging."""
+    logging.basicConfig(
+        level=getattr(logging, log_level),
+        format='{"time": "%(asctime)s", "level": "%(levelname)s", "logger": "%(name)s", "message": "%(message)s"}',
+        handlers=[logging.StreamHandler(sys.stdout)],
+        force=True
+    )
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Handle application startup and shutdown."""
-    logger.info("Starting Ollama-OpenAI Proxy Service")
-    yield
-    logger.info("Shutting down Ollama-OpenAI Proxy Service")
+    try:
+        # Load and validate settings
+        settings = get_settings()
+        
+        # Configure logging with the specified level
+        configure_logging(settings.log_level)
+        
+        # Log startup information
+        logger.info(
+            "Starting Ollama-OpenAI Proxy Service",
+            extra={
+                "version": __version__,
+                "port": settings.proxy_port,
+                "log_level": settings.log_level,
+                "openai_base_url": settings.openai_api_base_url
+            }
+        )
+        
+        # Store settings in app state for access in routes
+        app.state.settings = settings
+        
+        yield
+        
+    except Exception as e:
+        logger.error(f"Failed to start application: {e}")
+        raise ConfigurationError(f"Application startup failed: {e}") from e
+    finally:
+        logger.info("Shutting down Ollama-OpenAI Proxy Service")
 
 
+# Create FastAPI app
 app = FastAPI(
     title="Ollama-OpenAI Proxy",
     description="OpenAI-compatible proxy for Ollama API",
@@ -36,23 +70,81 @@ app = FastAPI(
 @app.get("/health")
 async def health_check() -> JSONResponse:
     """Health check endpoint."""
-    return JSONResponse(
-        content={
-            "status": "healthy",
-            "version": __version__
-        }
-    )
+    try:
+        # Verify we can access settings
+        settings = app.state.settings
+        
+        return JSONResponse(
+            content={
+                "status": "healthy",
+                "version": __version__,
+                "configured": True,
+                "port": settings.proxy_port
+            }
+        )
+    except Exception:
+        return JSONResponse(
+            status_code=503,
+            content={
+                "status": "unhealthy",
+                "version": __version__,
+                "configured": False,
+                "error": "Configuration not loaded"
+            }
+        )
+
+
+@app.get("/config/validate")
+async def validate_config() -> JSONResponse:
+    """Validate configuration (excludes sensitive data)."""
+    try:
+        settings = app.state.settings
+        
+        return JSONResponse(
+            content={
+                "status": "valid",
+                "config": {
+                    "openai_api_base_url": settings.openai_api_base_url,
+                    "proxy_port": settings.proxy_port,
+                    "log_level": settings.log_level,
+                    "request_timeout": settings.request_timeout,
+                    "api_key_configured": bool(settings.openai_api_key)
+                }
+            }
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Configuration validation failed: {str(e)}"
+        )
 
 
 def main() -> None:
     """Run the application."""
     import uvicorn
-    uvicorn.run(
-        "ollama_openai_proxy.main:app",
-        host="0.0.0.0",
-        port=11434,
-        reload=True
-    )
+    
+    try:
+        # Load settings to fail fast if configuration is invalid
+        settings = get_settings()
+        
+        # Configure logging before starting the server
+        configure_logging(settings.log_level)
+        
+        logger.info(f"Starting server on port {settings.proxy_port}")
+        
+        uvicorn.run(
+            "ollama_openai_proxy.main:app",
+            host="0.0.0.0",
+            port=settings.proxy_port,
+            reload=True,
+            log_config=None  # Use our custom logging
+        )
+    except ConfigurationError as e:
+        print(f"Configuration Error: {e}", file=sys.stderr)
+        sys.exit(1)
+    except Exception as e:
+        print(f"Failed to start application: {e}", file=sys.stderr)
+        sys.exit(1)
 
 
 if __name__ == "__main__":
