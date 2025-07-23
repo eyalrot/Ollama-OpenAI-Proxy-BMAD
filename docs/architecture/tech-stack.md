@@ -1,5 +1,13 @@
 # Tech Stack
 
+## Development Environment Philosophy
+
+- **Local Development:** Python virtual environments (venv) for isolation and consistency
+- **CI/CD:** Containerized environments with direct dependency installation
+- **Production:** Docker containers without virtual environments
+
+This approach ensures developers have reproducible environments while keeping CI/CD and production deployments simple and fast.
+
 ## Cloud Infrastructure
 
 - **Provider:** Any cloud provider or on-premises
@@ -25,3 +33,6 @@
 | **Testing** | pytest-asyncio | 0.23.3 | Async test support | Required for async endpoint testing |
 | **Linting** | ruff | 0.1.14 | Code linting | Fast, comprehensive Python linter |
 | **Type Checking** | mypy | 1.8.0 | Static type checking | Catches type errors early |
+| **Dev Environment** | venv | Built-in | Virtual environments | Local development isolation (required) |
+| **CI/CD** | GitHub Actions | N/A | Continuous Integration | Automated testing and deployment |
+| **Pre-commit** | pre-commit | 3.6.0 | Git hooks | Automated code quality checks |

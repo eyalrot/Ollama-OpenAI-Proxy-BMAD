@@ -1,5 +1,15 @@
 # Ollama-OpenAI Proxy Service Architecture Document
 
+## ⚠️ CRITICAL: API Compliance
+
+**Before implementing ANY Ollama API endpoint, you MUST:**
+1. Review the [API Compliance Checklist](./api-compliance-checklist.md)
+2. Check the [Ollama API Analysis](./ollama-api-analysis.md) for known quirks
+3. Read the [Epic 1 Fix Guide](./epic-1-fix-guide.md) for lessons learned
+4. Implement contract tests FIRST
+
+**The #1 cause of SDK failures is missing duplicate fields** (e.g., both `name` and `model` in `/api/tags`).
+
 ## Table of Contents
 
 - [Ollama-OpenAI Proxy Service Architecture Document](#table-of-contents)
@@ -12,6 +22,7 @@
     - [High Level Project Diagram](./high-level-architecture.md#high-level-project-diagram)
     - [Architectural and Design Patterns](./high-level-architecture.md#architectural-and-design-patterns)
   - [Tech Stack](./tech-stack.md)
+    - [Development Environment Philosophy](./tech-stack.md#development-environment-philosophy)
     - [Cloud Infrastructure](./tech-stack.md#cloud-infrastructure)
     - [Technology Stack Table](./tech-stack.md#technology-stack-table)
   - [Data Models](./data-models.md)
@@ -35,12 +46,22 @@
       - [POST /api/chat](./api-endpoints-development-phases.md#post-apichat)
       - [POST /api/embeddings, /api/embed](./api-endpoints-development-phases.md#post-apiembeddings-apiembed)
   - [Core Workflows](./core-workflows.md)
-  - [Ollama API Implementation](./ollama-api-implementation.md)
+  - [Ollama API Implementation](./ollama-api-implementation.md) ⚠️ **CRITICAL**
+    - [Critical API Compliance Guidelines](./ollama-api-implementation.md#critical-api-compliance-guidelines)
     - [Ollama API Endpoints](./ollama-api-implementation.md#ollama-api-endpoints)
       - [GET /api/tags](./ollama-api-implementation.md#get-apitags)
       - [POST /api/generate](./ollama-api-implementation.md#post-apigenerate)
       - [POST /api/chat](./ollama-api-implementation.md#post-apichat)
       - [POST /api/embeddings or /api/embed](./ollama-api-implementation.md#post-apiembeddings-or-apiembed)
+  - [Ollama API Analysis](./ollama-api-analysis.md) ⚠️ **CRITICAL**
+    - [Critical API Structure](./ollama-api-analysis.md#critical-api-structure-for-apitags)
+    - [SDK vs API Discrepancy](./ollama-api-analysis.md#sdk-vs-api-discrepancy)
+  - [Ollama API Detailed Documentation](./ollama-api-analysis-chat-embeddings.md)
+    - [Generate Endpoint](./ollama-api-analysis-chat-embeddings.md#generate-endpoint-apigenerate)
+    - [Chat Completion Endpoint](./ollama-api-analysis-chat-embeddings.md#chat-completion-endpoint-apichat)
+    - [Embeddings Endpoint](./ollama-api-analysis-chat-embeddings.md#embeddings-endpoint-apiembed)
+  - [API Compliance Checklist](./api-compliance-checklist.md) ⚠️ **MUST READ**
+  - [Epic 1 Fix Guide](./epic-1-fix-guide.md) - Lessons Learned
   - [Database Schema](./database-schema.md)
   - [Source Tree](./source-tree.md)
   - [Infrastructure and Deployment](./infrastructure-and-deployment.md)
@@ -52,7 +73,12 @@
       - [3. Python Wheel Distribution](./infrastructure-and-deployment.md#3-python-wheel-distribution)
       - [4. PyPI Distribution](./infrastructure-and-deployment.md#4-pypi-distribution)
     - [Environments](./infrastructure-and-deployment.md#environments)
+      - [Development Environment](./infrastructure-and-deployment.md#development-environment)
+      - [CI/CD Environment](./infrastructure-and-deployment.md#cicd-environment)
+      - [Staging Environment](./infrastructure-and-deployment.md#staging-environment)
+      - [Production Environment](./infrastructure-and-deployment.md#production-environment)
     - [Environment Promotion Flow](./infrastructure-and-deployment.md#environment-promotion-flow)
+    - [CI/CD Pipeline Details](./infrastructure-and-deployment.md#cicd-pipeline-details)
     - [Rollback Strategy](./infrastructure-and-deployment.md#rollback-strategy)
     - [Package Distribution](./infrastructure-and-deployment.md#package-distribution)
   - [Error Handling Strategy](./error-handling-strategy.md)
@@ -62,15 +88,23 @@
       - [External API Errors](./error-handling-strategy.md#external-api-errors)
       - [Business Logic Errors](./error-handling-strategy.md#business-logic-errors)
       - [Data Consistency](./error-handling-strategy.md#data-consistency)
+  - [Development Environment](./development-environment.md)
+    - [Overview](./development-environment.md#overview)
+    - [Local Development Setup](./development-environment.md#local-development-setup)
+    - [CI/CD Environment](./development-environment.md#cicd-environment)
+    - [Docker Development](./development-environment.md#docker-development)
+    - [Best Practices](./development-environment.md#best-practices)
   - [Coding Standards](./coding-standards.md)
     - [Core Standards](./coding-standards.md#core-standards)
     - [Naming Conventions](./coding-standards.md#naming-conventions)
     - [Critical Rules](./coding-standards.md#critical-rules)
-  - [Test Strategy and Standards](./test-strategy-and-standards.md)
+    - [Development Environment Setup](./coding-standards.md#development-environment-setup)
+  - [Test Strategy and Standards](./test-strategy-and-standards.md) ⚠️ **CRITICAL**
     - [Testing Philosophy](./test-strategy-and-standards.md#testing-philosophy)
     - [Test Types and Organization](./test-strategy-and-standards.md#test-types-and-organization)
       - [Unit Tests](./test-strategy-and-standards.md#unit-tests)
       - [Integration Tests](./test-strategy-and-standards.md#integration-tests)
+      - [Contract Tests](./test-strategy-and-standards.md#contract-tests-new-critical-for-api-compliance) ⚠️ **NEW**
       - [End-to-End Tests](./test-strategy-and-standards.md#end-to-end-tests)
     - [Test Data Management](./test-strategy-and-standards.md#test-data-management)
     - [Continuous Testing](./test-strategy-and-standards.md#continuous-testing)
