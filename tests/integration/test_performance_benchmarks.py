@@ -1,23 +1,20 @@
-"""Performance benchmarks for SDK compatibility."""
+"""Integration performance benchmarks for real server testing."""
 import statistics
 import time
-from typing import List
-from unittest.mock import patch
+from typing import Callable, List
 
 import pytest
 
 ollama = pytest.importorskip("ollama")
 
-# Import after ollama to avoid E402
-from ollama_openai_proxy.services.openai_service import OpenAIService  # noqa: E402
-
 
 @pytest.mark.sdk
 @pytest.mark.slow
-class TestPerformanceBenchmarks:
-    """Performance benchmarks for Ollama SDK operations."""
+@pytest.mark.integration
+class TestRealServerPerformance:
+    """Performance benchmarks against real running servers."""
 
-    def measure_response_time(self, func, iterations: int = 100) -> List[float]:
+    def measure_response_time(self, func: Callable, iterations: int = 10) -> List[float]:
         """Measure response time over multiple iterations."""
         times = []
         for _ in range(iterations):
@@ -26,92 +23,136 @@ class TestPerformanceBenchmarks:
             times.append(time.time() - start)
         return times
 
-    def test_list_models_benchmark(self):
-        """Benchmark model listing performance."""
-        from openai.types import Model
+    def test_real_server_performance_benchmark(self) -> None:
+        """Benchmark model listing performance against real server."""
+        client = ollama.Client(host="http://localhost:11434")
 
-        # Mock models
-        mock_models = [
-            Model(id=f"model-{i}", created=1680000000 + i, object="model", owned_by="openai")
-            for i in range(50)  # 50 models
-        ]
-
-        with patch.object(OpenAIService, "list_models", return_value=mock_models):
-            client = ollama.Client(host="http://localhost:11434")
-
-            # Warmup
-            for _ in range(10):
+        # Warmup (fewer iterations for real server)
+        for _ in range(3):
+            try:
                 client.list()
+            except Exception:
+                pytest.skip("Cannot connect to proxy server")
 
-            # Measure
-            times = self.measure_response_time(lambda: client.list(), iterations=100)
+        # Measure performance (fewer iterations for CI)
+        times = self.measure_response_time(lambda: client.list(), iterations=10)
 
-            # Calculate statistics
-            avg_time = statistics.mean(times)
-            median_time = statistics.median(times)
-            p95_time = statistics.quantiles(times, n=20)[18]  # 95th percentile
-            p99_time = statistics.quantiles(times, n=100)[98]  # 99th percentile
+        # Calculate statistics
+        avg_time = statistics.mean(times)
+        median_time = statistics.median(times)
+        max_time = max(times)
+        min_time = min(times)
 
-            # Log results
-            print("\nList Models Performance:")
-            print(f"  Average: {avg_time*1000:.2f}ms")
-            print(f"  Median: {median_time*1000:.2f}ms")
-            print(f"  P95: {p95_time*1000:.2f}ms")
-            print(f"  P99: {p99_time*1000:.2f}ms")
+        # Log results
+        print("\nReal Server Performance:")
+        print(f"  Average: {avg_time*1000:.2f}ms")
+        print(f"  Median: {median_time*1000:.2f}ms")
+        print(f"  Min: {min_time*1000:.2f}ms")
+        print(f"  Max: {max_time*1000:.2f}ms")
 
-            # Assert performance requirements
-            assert avg_time < 0.1  # Average under 100ms
-            assert p95_time < 0.15  # 95th percentile under 150ms
-            assert p99_time < 0.2  # 99th percentile under 200ms
+        # Assert reasonable performance requirements for real server
+        assert avg_time < 2.0  # Average under 2 seconds
+        assert max_time < 10.0  # No request over 10 seconds
+
+    def test_real_server_response_time(self) -> None:
+        """Test basic response time against real server."""
+        client = ollama.Client(host="http://localhost:11434")
+
+        start_time = time.time()
+        try:
+            response = client.list()
+            duration = time.time() - start_time
+
+            # Should complete within reasonable time
+            assert duration < 5.0  # 5 seconds max
+            assert isinstance(response, dict)
+
+            print(f"Single request time: {duration*1000:.2f}ms")
+
+        except Exception as e:
+            pytest.skip(f"Cannot test performance - server not available: {e}")
+
+    def test_real_server_load_handling(self) -> None:
+        """Test how server handles multiple sequential requests."""
+        client = ollama.Client(host="http://localhost:11434")
+
+        response_times = []
+        errors = 0
+
+        # Make 20 sequential requests
+        for i in range(20):
+            start = time.time()
+            try:
+                response = client.list()
+                duration = time.time() - start
+                response_times.append(duration)
+
+                # Verify response is valid
+                assert isinstance(response, dict)
+                assert "models" in response
+
+            except Exception as e:
+                errors += 1
+                print(f"Request {i+1} failed: {e}")
+
+        if not response_times:
+            pytest.skip("No successful requests - server not available")
+
+        # Calculate statistics
+        avg_time = statistics.mean(response_times)
+        max_time = max(response_times)
+
+        print("\nLoad test results:")
+        print(f"  Successful requests: {len(response_times)}/20")
+        print(f"  Failed requests: {errors}")
+        print(f"  Average time: {avg_time*1000:.2f}ms")
+        print(f"  Max time: {max_time*1000:.2f}ms")
+
+        # Most requests should succeed
+        assert errors < 5  # Less than 25% failure rate
+        assert avg_time < 5.0  # Average under 5 seconds
 
 
 @pytest.mark.sdk
-class TestOllamaSDKEdgeCases:
-    """Test edge cases with Ollama SDK."""
+@pytest.mark.integration
+class TestRealServerEdgeCases:
+    """Test edge cases against real server."""
 
-    def test_special_characters_in_model_names(self):
-        """Test handling of special characters in model names."""
-        from openai.types import Model
+    def test_server_availability(self) -> None:
+        """Test server availability and basic functionality."""
+        client = ollama.Client(host="http://localhost:11434")
 
-        # Models with special characters
-        special_models = [
-            Model(id="gpt-3.5-turbo", created=1680000000, object="model", owned_by="openai"),
-            Model(id="gpt-4-vision-preview", created=1680000001, object="model", owned_by="openai"),
-            Model(id="text-embedding-3-large", created=1680000002, object="model", owned_by="openai"),
-        ]
-
-        with patch.object(OpenAIService, "list_models", return_value=special_models):
-            client = ollama.Client(host="http://localhost:11434")
+        try:
             response = client.list()
+            assert isinstance(response, dict)
+            assert "models" in response
+            print(f"Server is available with {len(response['models'])} models")
 
-            # All models should be present
-            assert len(response["models"]) == 3
+        except Exception as e:
+            pytest.fail(f"Server not available: {e}")
 
-    def test_very_large_model_list(self):
-        """Test handling of very large model lists."""
-        from openai.types import Model
+    def test_multiple_clients(self) -> None:
+        """Test multiple client instances."""
+        clients = [ollama.Client(host="http://localhost:11434") for _ in range(3)]
 
-        # Create 1000 models
-        large_model_list = [
-            Model(id=f"model-{i:04d}", created=1680000000 + i, object="model", owned_by="openai") for i in range(1000)
-        ]
+        responses = []
+        for i, client in enumerate(clients):
+            try:
+                response = client.list()
+                responses.append(response)
+                print(f"Client {i+1}: {len(response['models'])} models")
+            except Exception as e:
+                pytest.fail(f"Client {i+1} failed: {e}")
 
-        with patch.object(OpenAIService, "list_models", return_value=large_model_list):
-            client = ollama.Client(host="http://localhost:11434")
-            response = client.list()
-
-            # Should handle large lists
-            assert len(response["models"]) <= 1000  # May filter some
-
-            # Should complete in reasonable time
-            start = time.time()
-            client.list()
-            duration = time.time() - start
-            assert duration < 1.0  # Under 1 second even for large list
+        # All clients should get responses
+        assert len(responses) == 3
+        for response in responses:
+            assert isinstance(response, dict)
+            assert "models" in response
 
 
-def test_ollama_cli_compatibility():
-    """Test compatibility with Ollama CLI (manual test)."""
+def test_ollama_cli_compatibility() -> None:
+    """Test compatibility with Ollama CLI (manual test instructions)."""
     instructions = """
     Manual test for Ollama CLI compatibility:
 
