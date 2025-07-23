@@ -1,16 +1,19 @@
 """Custom exceptions for Ollama-OpenAI Proxy."""
 
 
-class ProxyException(Exception):
+class ProxyError(Exception):
     """Base exception for all proxy errors."""
+
     pass
 
 
-class ConfigurationError(ProxyException):
+class ConfigurationError(ProxyError):
     """Raised when configuration is invalid or missing."""
+
     pass
 
 
-class OpenAIError(ProxyException):
+class OpenAIError(ProxyError):
     """Raised when OpenAI API returns an error."""
+
     pass

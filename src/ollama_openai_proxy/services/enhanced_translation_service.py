@@ -2,7 +2,7 @@
 import hashlib
 import logging
 from datetime import datetime
-from typing import Dict, List, Optional, Set
+from typing import ClassVar, Dict, List, Optional, Set
 
 from openai.types import Model
 
@@ -14,16 +14,16 @@ logger = logging.getLogger(__name__)
 
 class ModelRegistry:
     """Registry for model metadata and mappings."""
-    
+
     # Model aliases (Ollama name -> OpenAI ID)
-    MODEL_ALIASES: Dict[str, str] = {
+    MODEL_ALIASES: ClassVar[Dict[str, str]] = {
         "llama2": "gpt-3.5-turbo",  # Fallback mapping
         "mistral": "gpt-3.5-turbo",  # Fallback mapping
         "codellama": "gpt-3.5-turbo-16k",  # For code-specific tasks
     }
-    
+
     # Model categories
-    CHAT_MODELS: Set[str] = {
+    CHAT_MODELS: ClassVar[Set[str]] = {
         "gpt-3.5-turbo",
         "gpt-3.5-turbo-16k",
         "gpt-4",
@@ -32,15 +32,15 @@ class ModelRegistry:
         "gpt-4o",
         "gpt-4o-mini",
     }
-    
-    EMBEDDING_MODELS: Set[str] = {
+
+    EMBEDDING_MODELS: ClassVar[Set[str]] = {
         "text-embedding-ada-002",
         "text-embedding-3-small",
         "text-embedding-3-large",
     }
-    
+
     # Model metadata
-    MODEL_METADATA: Dict[str, Dict] = {
+    MODEL_METADATA: ClassVar[Dict[str, Dict]] = {
         "gpt-3.5-turbo": {
             "size": 1_500_000_000,
             "description": "Most capable GPT-3.5 model",
@@ -86,41 +86,41 @@ class ModelRegistry:
 
 class EnhancedTranslationService(TranslationService):
     """Enhanced translation service with better model handling."""
-    
+
     @classmethod
     def generate_model_digest(cls, model_id: str) -> str:
         """
         Generate a digest/hash for a model.
-        
+
         Args:
             model_id: Model identifier
-            
+
         Returns:
             str: Digest in format "sha256:hash"
         """
         # Create a stable hash based on model ID
         hash_object = hashlib.sha256(f"openai:{model_id}".encode())
         return f"sha256:{hash_object.hexdigest()[:12]}"
-    
+
     @classmethod
     def estimate_model_size(cls, model: Model) -> int:
         """
         Estimate model size with fallback logic.
-        
+
         Args:
             model: OpenAI model
-            
+
         Returns:
             int: Estimated size in bytes
         """
         # Check registry first
         metadata = ModelRegistry.MODEL_METADATA.get(model.id)
         if metadata and "size" in metadata:
-            return metadata["size"]
-        
+            return int(metadata["size"])
+
         # Fallback based on model type
         model_id_lower = model.id.lower()
-        
+
         if "embedding" in model_id_lower:
             # Smaller size for embedding models
             return 500_000_000  # 500MB
@@ -133,97 +133,85 @@ class EnhancedTranslationService(TranslationService):
         else:
             # Default fallback
             return cls.DEFAULT_MODEL_SIZE
-    
+
     @classmethod
     def create_ollama_model(
-        cls,
-        openai_model: Model,
-        include_digest: bool = True,
-        custom_metadata: Optional[Dict] = None
+        cls, openai_model: Model, include_digest: bool = True, custom_metadata: Optional[Dict] = None
     ) -> OllamaModel:
         """
         Create Ollama model with enhanced metadata.
-        
+
         Args:
             openai_model: OpenAI model
             include_digest: Whether to include digest
             custom_metadata: Additional metadata to include
-            
+
         Returns:
             OllamaModel: Enhanced Ollama model
         """
         # Convert timestamp
         created_dt = datetime.fromtimestamp(openai_model.created)
         modified_at = created_dt.isoformat() + "Z"
-        
+
         # Get size estimate
         size = cls.estimate_model_size(openai_model)
-        
+
         # Generate digest if requested
         digest = cls.generate_model_digest(openai_model.id) if include_digest else ""
-        
+
         # Create base model
-        ollama_model = OllamaModel(
-            name=openai_model.id,
-            modified_at=modified_at,
-            size=size,
-            digest=digest
-        )
-        
+        ollama_model = OllamaModel(name=openai_model.id, modified_at=modified_at, size=size, digest=digest)
+
         # Add custom metadata if provided
         if custom_metadata:
             for key, value in custom_metadata.items():
                 if hasattr(ollama_model, key):
                     setattr(ollama_model, key, value)
-        
+
         return ollama_model
-    
+
     @classmethod
     def should_include_model(cls, model: Model) -> bool:
         """
         Enhanced model filtering with registry.
-        
+
         Args:
             model: OpenAI model
-            
+
         Returns:
             bool: True if model should be included
         """
         model_id = model.id
-        
+
         # Check if in known models
         if model_id in ModelRegistry.CHAT_MODELS:
             return True
         if model_id in ModelRegistry.EMBEDDING_MODELS:
             return True
-        
+
         # Check aliases
         if model_id in ModelRegistry.MODEL_ALIASES.values():
             return True
-        
+
         # Use parent class logic as fallback
         return cls._should_include_model(model)
-    
+
     @classmethod
-    def translate_with_metadata(
-        cls,
-        openai_models: List[Model],
-        include_metadata: bool = False
-    ) -> OllamaTagsResponse:
+    def translate_with_metadata(cls, openai_models: List[Model], include_metadata: bool = False) -> OllamaTagsResponse:
         """
         Translate with optional metadata inclusion.
-        
+
         Args:
             openai_models: List of OpenAI models
             include_metadata: Whether to include extra metadata
-            
+
         Returns:
             OllamaTagsResponse: Response with translated models
         """
         ollama_models = []
         included_count = 0
         excluded_count = 0
-        
+
         for openai_model in openai_models:
             try:
                 if cls.should_include_model(openai_model):
@@ -231,38 +219,31 @@ class EnhancedTranslationService(TranslationService):
                     metadata = None
                     if include_metadata:
                         metadata = ModelRegistry.MODEL_METADATA.get(openai_model.id, {})
-                    
+
                     # Create Ollama model
-                    ollama_model = cls.create_ollama_model(
-                        openai_model,
-                        include_digest=True,
-                        custom_metadata=metadata
-                    )
-                    
+                    ollama_model = cls.create_ollama_model(openai_model, include_digest=True, custom_metadata=metadata)
+
                     ollama_models.append(ollama_model)
                     included_count += 1
                 else:
                     excluded_count += 1
                     logger.debug(f"Excluded model: {openai_model.id}")
-                    
+
             except Exception as e:
-                logger.error(
-                    f"Failed to translate model {openai_model.id}: {e}",
-                    exc_info=True
-                )
+                logger.error(f"Failed to translate model {openai_model.id}: {e}", exc_info=True)
                 continue
-        
+
         # Sort models by name for consistent output
         ollama_models.sort(key=lambda m: m.name)
-        
+
         logger.info(
-            f"Model translation complete",
+            "Model translation complete",
             extra={
                 "total_models": len(openai_models),
                 "included": included_count,
                 "excluded": excluded_count,
-                "errors": len(openai_models) - included_count - excluded_count
-            }
+                "errors": len(openai_models) - included_count - excluded_count,
+            },
         )
-        
+
         return OllamaTagsResponse(models=ollama_models)

@@ -1,7 +1,5 @@
 """Configuration management for Ollama-OpenAI Proxy."""
-import os
 from functools import lru_cache
-from typing import Optional
 
 from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -9,50 +7,29 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     """Application settings with validation."""
-    
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
         case_sensitive=False,
     )
-    
+
     # OpenAI Configuration
-    openai_api_key: SecretStr = Field(
-        ...,
-        description="OpenAI API key for authentication"
-    )
-    openai_api_base_url: str = Field(
-        default="https://api.openai.com/v1",
-        description="Base URL for OpenAI API"
-    )
-    
+    openai_api_key: SecretStr = Field(..., description="OpenAI API key for authentication")
+    openai_api_base_url: str = Field(default="https://api.openai.com/v1", description="Base URL for OpenAI API")
+
     # Proxy Configuration
-    proxy_port: int = Field(
-        default=11434,
-        description="Port for the proxy service",
-        ge=1,
-        le=65535
-    )
-    
+    proxy_port: int = Field(default=11434, description="Port for the proxy service", ge=1, le=65535)
+
     # Logging Configuration
-    log_level: str = Field(
-        default="INFO",
-        description="Logging level"
-    )
-    
+    log_level: str = Field(default="INFO", description="Logging level")
+
     # Request Configuration
-    request_timeout: int = Field(
-        default=300,
-        description="Request timeout in seconds",
-        ge=1
-    )
-    
+    request_timeout: int = Field(default=300, description="Request timeout in seconds", ge=1)
+
     # Application Info
-    app_name: str = Field(
-        default="Ollama-OpenAI Proxy",
-        description="Application name"
-    )
-    
+    app_name: str = Field(default="Ollama-OpenAI Proxy", description="Application name")
+
     @field_validator("log_level")
     @classmethod
     def validate_log_level(cls, v: str) -> str:
@@ -62,7 +39,7 @@ class Settings(BaseSettings):
         if v_upper not in valid_levels:
             raise ValueError(f"Invalid log level: {v}. Must be one of {valid_levels}")
         return v_upper
-    
+
     @field_validator("openai_api_base_url")
     @classmethod
     def validate_base_url(cls, v: str) -> str:
@@ -71,7 +48,7 @@ class Settings(BaseSettings):
             raise ValueError("Base URL must start with http:// or https://")
         # Remove trailing slash for consistency
         return v.rstrip("/")
-    
+
     def get_openai_api_key(self) -> str:
         """Get the OpenAI API key value."""
         return self.openai_api_key.get_secret_value()
@@ -81,18 +58,18 @@ class Settings(BaseSettings):
 def get_settings() -> Settings:
     """
     Get cached settings instance.
-    
+
     This function is cached to ensure we only create one Settings
     instance for the entire application lifecycle.
-    
+
     Returns:
         Settings: The application settings
-    
+
     Raises:
         ValidationError: If required settings are missing or invalid
     """
     try:
-        settings = Settings()
+        settings = Settings()  # type: ignore[call-arg]
         return settings
     except Exception as e:
         # Provide helpful error message for missing API key
