@@ -9,7 +9,7 @@ from fastapi.responses import JSONResponse
 
 from .config import get_settings
 from .exceptions import ConfigurationError
-from .routes import tags
+from .routes import generate, tags
 from .services.openai_service import OpenAIService
 
 # Will be configured after settings are loaded
@@ -78,6 +78,7 @@ app = FastAPI(
 
 # Include routers
 app.include_router(tags.router)
+app.include_router(generate.router)
 
 
 @app.get("/health")

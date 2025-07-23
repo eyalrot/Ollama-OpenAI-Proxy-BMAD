@@ -87,9 +87,9 @@ class TestProxyServerPerformance:
                 duration = time.time() - start
                 response_times.append(duration)
 
-                # Verify response is valid
-                assert isinstance(response, dict)
-                assert "models" in response
+                # Verify response is valid (ollama 0.5+ format)
+                assert hasattr(response, "models")
+                assert isinstance(response.models, list)
 
             except Exception as e:
                 errors += 1
@@ -124,9 +124,9 @@ class TestProxyServerEdgeCases:
 
         try:
             response = client.list()
-            assert isinstance(response, dict)
-            assert "models" in response
-            print(f"Proxy server is available with {len(response['models'])} models from OpenAI")
+            assert hasattr(response, "models")
+            assert isinstance(response.models, list)
+            print(f"Proxy server is available with {len(response.models)} models from OpenAI")
 
         except Exception as e:
             pytest.fail(f"Proxy server not available: {e}")
@@ -140,15 +140,15 @@ class TestProxyServerEdgeCases:
             try:
                 response = client.list()
                 responses.append(response)
-                print(f"Client {i+1}: {len(response['models'])} models from proxy")
+                print(f"Client {i+1}: {len(response.models)} models from proxy")
             except Exception as e:
                 pytest.fail(f"Client {i+1} failed to connect to proxy: {e}")
 
         # All clients should get responses
         assert len(responses) == 3
         for response in responses:
-            assert isinstance(response, dict)
-            assert "models" in response
+            assert hasattr(response, "models")
+            assert isinstance(response.models, list)
 
 
 def test_ollama_cli_compatibility() -> None:

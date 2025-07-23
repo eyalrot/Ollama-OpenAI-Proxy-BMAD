@@ -84,3 +84,89 @@ class OllamaError(BaseModel):
     error: str = Field(..., description="Error message")
 
     model_config = ConfigDict(json_schema_extra={"example": {"error": "model not found"}})
+
+
+class OllamaGenerateRequest(BaseModel):
+    """Request format for /api/generate endpoint."""
+
+    model: str = Field(..., description="Model name/ID to use for generation")
+    prompt: str = Field(..., description="The prompt to generate from")
+    stream: Optional[bool] = Field(default=True, description="Whether to stream the response")
+    raw: Optional[bool] = Field(default=False, description="Whether to use raw mode (bypass prompt template)")
+    format: Optional[str] = Field(default=None, description="Output format (e.g., 'json')")
+    system: Optional[str] = Field(default=None, description="System prompt to use")
+    template: Optional[str] = Field(default=None, description="Custom prompt template")
+    context: Optional[List[int]] = Field(default=None, description="Context from previous response for continuation")
+    options: Optional[Dict[str, Any]] = Field(default=None, description="Model parameters")
+    keep_alive: Optional[str] = Field(default=None, description="How long to keep model loaded")
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "model": "llama2",
+                "prompt": "Why is the sky blue?",
+                "stream": False,
+                "options": {"temperature": 0.7, "top_p": 0.9, "seed": 42},
+            }
+        }
+    )
+
+
+class OllamaGenerateResponse(BaseModel):
+    """Response format for /api/generate endpoint (non-streaming)."""
+
+    model: str = Field(..., description="Model used for generation")
+    created_at: str = Field(..., description="RFC3339 timestamp with timezone")
+    response: str = Field(..., description="Generated text")
+    done: bool = Field(..., description="Whether generation is complete")
+    done_reason: Optional[str] = Field(default=None, description="Reason for completion: 'stop', 'length', or 'load'")
+    context: Optional[List[int]] = Field(default=None, description="Context for continuing conversation")
+    total_duration: Optional[int] = Field(default=None, description="Total time in nanoseconds")
+    load_duration: Optional[int] = Field(default=None, description="Model load time in nanoseconds")
+    prompt_eval_count: Optional[int] = Field(default=None, description="Number of tokens in prompt")
+    prompt_eval_duration: Optional[int] = Field(default=None, description="Time to evaluate prompt in nanoseconds")
+    eval_count: Optional[int] = Field(default=None, description="Number of tokens generated")
+    eval_duration: Optional[int] = Field(default=None, description="Time to generate response in nanoseconds")
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "model": "llama2",
+                "created_at": "2023-08-04T19:56:02.647Z",
+                "response": "The sky appears blue because of a phenomenon called Rayleigh scattering.",
+                "done": True,
+                "done_reason": "stop",
+                "context": [128006, 882, 128007],
+                "total_duration": 5589157167,
+                "load_duration": 3013701500,
+                "prompt_eval_count": 26,
+                "prompt_eval_duration": 342546000,
+                "eval_count": 298,
+                "eval_duration": 4956026000,
+            }
+        }
+    )
+
+
+class OllamaGenerateStreamChunk(BaseModel):
+    """Response format for /api/generate endpoint (streaming chunk)."""
+
+    model: str = Field(..., description="Model used for generation")
+    created_at: str = Field(..., description="RFC3339 timestamp with timezone")
+    response: str = Field(..., description="Generated text chunk")
+    done: bool = Field(..., description="Whether generation is complete")
+    # These fields are only present in the final chunk when done=True
+    done_reason: Optional[str] = Field(default=None, description="Reason for completion (final chunk only)")
+    context: Optional[List[int]] = Field(default=None, description="Context for continuation (final chunk only)")
+    total_duration: Optional[int] = Field(default=None, description="Total time (final chunk only)")
+    load_duration: Optional[int] = Field(default=None, description="Model load time (final chunk only)")
+    prompt_eval_count: Optional[int] = Field(default=None, description="Prompt token count (final chunk only)")
+    prompt_eval_duration: Optional[int] = Field(default=None, description="Prompt eval time (final chunk only)")
+    eval_count: Optional[int] = Field(default=None, description="Generated token count (final chunk only)")
+    eval_duration: Optional[int] = Field(default=None, description="Generation time (final chunk only)")
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {"model": "llama2", "created_at": "2023-08-04T19:56:02.647Z", "response": "The", "done": False}
+        }
+    )

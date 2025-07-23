@@ -1,12 +1,19 @@
 """Enhanced translation service with comprehensive model handling."""
 import hashlib
 import logging
-from datetime import datetime
-from typing import ClassVar, Dict, List, Optional, Set
+from datetime import datetime, timezone
+from typing import Any, ClassVar, Dict, List, Optional, Set
 
 from openai.types import Model
+from openai.types.chat import ChatCompletion, ChatCompletionChunk
 
-from ..models.ollama import OllamaModel, OllamaTagsResponse
+from ..models.ollama import (
+    OllamaGenerateRequest,
+    OllamaGenerateResponse,
+    OllamaGenerateStreamChunk,
+    OllamaModel,
+    OllamaTagsResponse,
+)
 from .translation_service import TranslationService
 
 logger = logging.getLogger(__name__)
@@ -247,3 +254,140 @@ class EnhancedTranslationService(TranslationService):
         )
 
         return OllamaTagsResponse(models=ollama_models)
+
+    async def translate_generate_request(self, request: OllamaGenerateRequest) -> Dict[str, Any]:
+        """
+        Translate Ollama generate request to OpenAI chat completion format.
+
+        Args:
+            request: Ollama generate request
+
+        Returns:
+            Dict with OpenAI chat completion parameters
+        """
+        # Build messages array
+        messages = []
+
+        # Add system message if provided
+        if request.system:
+            messages.append({"role": "system", "content": request.system})
+
+        # Add user prompt
+        messages.append({"role": "user", "content": request.prompt})
+
+        # Build OpenAI request
+        openai_request = {
+            "model": ModelRegistry.MODEL_ALIASES.get(request.model, request.model),
+            "messages": messages,
+        }
+
+        # Only add stream parameter for non-streaming requests
+        # (streaming requests use a different method that always streams)
+        if not request.stream:
+            openai_request["stream"] = False
+
+        # Add options if provided
+        if request.options:
+            # Map Ollama options to OpenAI parameters
+            if "temperature" in request.options:
+                openai_request["temperature"] = request.options["temperature"]
+            if "top_p" in request.options:
+                openai_request["top_p"] = request.options["top_p"]
+            if "seed" in request.options:
+                openai_request["seed"] = request.options["seed"]
+            if "num_predict" in request.options:
+                openai_request["max_tokens"] = request.options["num_predict"]
+            if "stop" in request.options:
+                openai_request["stop"] = request.options["stop"]
+
+        logger.debug(f"Translated generate request: {request.model} -> {openai_request['model']}")
+
+        return openai_request
+
+    async def translate_generate_response(self, openai_response: ChatCompletion, model: str) -> OllamaGenerateResponse:
+        """
+        Translate OpenAI chat completion to Ollama generate response.
+
+        Args:
+            openai_response: OpenAI chat completion
+            model: Original model name from request
+
+        Returns:
+            OllamaGenerateResponse
+        """
+        # Extract the response text
+        response_text = ""
+        finish_reason = "stop"
+
+        if openai_response.choices:
+            choice = openai_response.choices[0]
+            if choice.message and choice.message.content:
+                response_text = choice.message.content
+            if choice.finish_reason:
+                finish_reason = choice.finish_reason
+
+        # Create Ollama response
+        # Format timestamp as RFC3339 with Z suffix
+        timestamp = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+
+        ollama_response = OllamaGenerateResponse(
+            model=model,
+            created_at=timestamp,
+            response=response_text,
+            done=True,
+            done_reason=finish_reason,
+            # Generate a dummy context for compatibility
+            # In a real implementation, this would be actual token IDs
+            context=[128006, 882, 128007, 128006, 78191, 128007],
+        )
+
+        # Add usage stats if available
+        if openai_response.usage:
+            if openai_response.usage.prompt_tokens:
+                ollama_response.prompt_eval_count = openai_response.usage.prompt_tokens
+            if openai_response.usage.completion_tokens:
+                ollama_response.eval_count = openai_response.usage.completion_tokens
+
+        return ollama_response
+
+    async def translate_generate_stream_chunk(
+        self, openai_chunk: ChatCompletionChunk, model: str
+    ) -> OllamaGenerateStreamChunk:
+        """
+        Translate OpenAI streaming chunk to Ollama generate stream chunk.
+
+        Args:
+            openai_chunk: OpenAI chat completion chunk
+            model: Original model name from request
+
+        Returns:
+            OllamaGenerateStreamChunk
+        """
+        # Extract content from chunk
+        content = ""
+        done = False
+        finish_reason = None
+
+        if openai_chunk.choices:
+            choice = openai_chunk.choices[0]
+            if choice.delta and choice.delta.content:
+                content = choice.delta.content
+            if choice.finish_reason:
+                done = True
+                finish_reason = choice.finish_reason
+
+        # Create Ollama chunk
+        # Format timestamp as RFC3339 with Z suffix
+        timestamp = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+
+        chunk = OllamaGenerateStreamChunk(
+            model=model,
+            created_at=timestamp,
+            response=content,
+            done=done,
+        )
+
+        if done and finish_reason:
+            chunk.done_reason = finish_reason
+
+        return chunk

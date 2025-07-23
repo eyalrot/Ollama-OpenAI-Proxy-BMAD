@@ -2,6 +2,7 @@
 import asyncio
 import os
 import sys
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
 # Add src to path for imports
@@ -25,7 +26,7 @@ if "LOG_LEVEL" not in os.environ:
 
 
 @pytest.fixture
-def mock_settings():
+def mock_settings() -> Any:
     """Create mock settings for testing."""
     settings = Settings(
         openai_api_key="test-key-12345",
@@ -38,7 +39,7 @@ def mock_settings():
 
 
 @pytest.fixture
-def test_client():
+def test_client() -> TestClient:
     """Create FastAPI test client."""
     # Clear settings cache
     get_settings.cache_clear()
@@ -56,7 +57,7 @@ async def async_client():
 
 
 @pytest.fixture
-def mock_openai_service(mock_settings):
+def mock_openai_service(mock_settings: Any) -> Any:
     """Create mock OpenAI service."""
     service = MagicMock(spec=OpenAIService)
     service.settings = mock_settings
@@ -75,7 +76,7 @@ def mock_openai_service(mock_settings):
 
 
 @pytest.fixture
-def mock_openai_models():
+def mock_openai_models() -> Any:
     """Create mock OpenAI model responses."""
     from openai.types import Model
 
@@ -87,7 +88,7 @@ def mock_openai_models():
 
 
 @pytest.fixture
-def mock_ollama_client(monkeypatch):
+def mock_ollama_client(monkeypatch: Any) -> Any:
     """Create mock Ollama client for SDK tests."""
     # Only create if ollama is installed
     try:
@@ -102,8 +103,83 @@ def mock_ollama_client(monkeypatch):
         pytest.skip("ollama package not installed")
 
 
+@pytest.fixture
+def mock_openai_completion() -> Any:
+    """Create mock OpenAI completion response."""
+    from openai.types.chat import ChatCompletion, ChatCompletionMessage
+    from openai.types.chat.chat_completion import Choice
+
+    return ChatCompletion(
+        id="chatcmpl-test123",
+        object="chat.completion",
+        created=1234567890,
+        model="gpt-3.5-turbo",
+        choices=[
+            Choice(
+                index=0,
+                message=ChatCompletionMessage(
+                    role="assistant", content="The sky appears blue because of a phenomenon called Rayleigh scattering."
+                ),
+                finish_reason="stop",
+            )
+        ],
+        usage={"prompt_tokens": 10, "completion_tokens": 20, "total_tokens": 30},
+    )
+
+
+@pytest.fixture
+def mock_openai_streaming() -> Any:
+    """Create mock OpenAI streaming response."""
+    from openai.types.chat import ChatCompletionChunk
+    from openai.types.chat.chat_completion_chunk import Choice, ChoiceDelta
+
+    async def stream_generator():
+        chunks = [
+            ChatCompletionChunk(
+                id="chatcmpl-test123",
+                object="chat.completion.chunk",
+                created=1234567890,
+                model="gpt-3.5-turbo",
+                choices=[Choice(index=0, delta=ChoiceDelta(content="The"), finish_reason=None)],
+            ),
+            ChatCompletionChunk(
+                id="chatcmpl-test123",
+                object="chat.completion.chunk",
+                created=1234567890,
+                model="gpt-3.5-turbo",
+                choices=[Choice(index=0, delta=ChoiceDelta(content=" sky"), finish_reason=None)],
+            ),
+            ChatCompletionChunk(
+                id="chatcmpl-test123",
+                object="chat.completion.chunk",
+                created=1234567890,
+                model="gpt-3.5-turbo",
+                choices=[Choice(index=0, delta=ChoiceDelta(content=" is"), finish_reason=None)],
+            ),
+            ChatCompletionChunk(
+                id="chatcmpl-test123",
+                object="chat.completion.chunk",
+                created=1234567890,
+                model="gpt-3.5-turbo",
+                choices=[Choice(index=0, delta=ChoiceDelta(content=" blue"), finish_reason=None)],
+            ),
+            ChatCompletionChunk(
+                id="chatcmpl-test123",
+                object="chat.completion.chunk",
+                created=1234567890,
+                model="gpt-3.5-turbo",
+                choices=[Choice(index=0, delta=ChoiceDelta(content=""), finish_reason="stop")],
+            ),
+        ]
+
+        for chunk in chunks:
+            yield chunk
+
+    return stream_generator
+
+
 @pytest.fixture(autouse=True)
-def reset_app_state():
+def reset_app_state() -> None:
     """Reset app state between tests."""
     # Clear any existing state
     if hasattr(app.state, "settings"):
@@ -128,7 +204,7 @@ def reset_app_state():
 
 
 # Markers for test organization
-def pytest_configure(config):
+def pytest_configure(config: Any) -> None:
     """Configure pytest with custom markers."""
     config.addinivalue_line("markers", "unit: Unit tests")
     config.addinivalue_line("markers", "integration: Integration tests")
