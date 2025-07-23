@@ -1,4 +1,4 @@
-"""Integration performance benchmarks for real server testing."""
+"""Integration performance benchmarks for our proxy server."""
 import statistics
 import time
 from typing import Callable, List
@@ -11,8 +11,8 @@ ollama = pytest.importorskip("ollama")
 @pytest.mark.sdk
 @pytest.mark.slow
 @pytest.mark.integration
-class TestRealServerPerformance:
-    """Performance benchmarks against real running servers."""
+class TestProxyServerPerformance:
+    """Performance benchmarks against our proxy server."""
 
     def measure_response_time(self, func: Callable, iterations: int = 10) -> List[float]:
         """Measure response time over multiple iterations."""
@@ -23,8 +23,8 @@ class TestRealServerPerformance:
             times.append(time.time() - start)
         return times
 
-    def test_real_server_performance_benchmark(self) -> None:
-        """Benchmark model listing performance against real server."""
+    def test_proxy_server_performance_benchmark(self) -> None:
+        """Benchmark model listing performance against our proxy server."""
         client = ollama.Client(host="http://localhost:11434")
 
         # Warmup (fewer iterations for real server)
@@ -44,18 +44,18 @@ class TestRealServerPerformance:
         min_time = min(times)
 
         # Log results
-        print("\nReal Server Performance:")
+        print("\nProxy Server Performance:")
         print(f"  Average: {avg_time*1000:.2f}ms")
         print(f"  Median: {median_time*1000:.2f}ms")
         print(f"  Min: {min_time*1000:.2f}ms")
         print(f"  Max: {max_time*1000:.2f}ms")
 
-        # Assert reasonable performance requirements for real server
-        assert avg_time < 2.0  # Average under 2 seconds
-        assert max_time < 10.0  # No request over 10 seconds
+        # Assert reasonable performance requirements for proxy + OpenAI API
+        assert avg_time < 5.0  # Average under 5 seconds (includes OpenAI API call)
+        assert max_time < 15.0  # No request over 15 seconds
 
-    def test_real_server_response_time(self) -> None:
-        """Test basic response time against real server."""
+    def test_proxy_server_response_time(self) -> None:
+        """Test basic response time against our proxy server."""
         client = ollama.Client(host="http://localhost:11434")
 
         start_time = time.time()
@@ -63,17 +63,17 @@ class TestRealServerPerformance:
             response = client.list()
             duration = time.time() - start_time
 
-            # Should complete within reasonable time
-            assert duration < 5.0  # 5 seconds max
+            # Should complete within reasonable time (including OpenAI API call)
+            assert duration < 10.0  # 10 seconds max for OpenAI API call
             assert isinstance(response, dict)
 
             print(f"Single request time: {duration*1000:.2f}ms")
 
         except Exception as e:
-            pytest.skip(f"Cannot test performance - server not available: {e}")
+            pytest.skip(f"Cannot test performance - proxy server not available: {e}")
 
-    def test_real_server_load_handling(self) -> None:
-        """Test how server handles multiple sequential requests."""
+    def test_proxy_server_load_handling(self) -> None:
+        """Test how our proxy server handles multiple sequential requests."""
         client = ollama.Client(host="http://localhost:11434")
 
         response_times = []
@@ -110,29 +110,29 @@ class TestRealServerPerformance:
 
         # Most requests should succeed
         assert errors < 5  # Less than 25% failure rate
-        assert avg_time < 5.0  # Average under 5 seconds
+        assert avg_time < 10.0  # Average under 10 seconds (including OpenAI API calls)
 
 
 @pytest.mark.sdk
 @pytest.mark.integration
-class TestRealServerEdgeCases:
-    """Test edge cases against real server."""
+class TestProxyServerEdgeCases:
+    """Test edge cases against our proxy server."""
 
-    def test_server_availability(self) -> None:
-        """Test server availability and basic functionality."""
+    def test_proxy_server_availability(self) -> None:
+        """Test our proxy server availability and basic functionality."""
         client = ollama.Client(host="http://localhost:11434")
 
         try:
             response = client.list()
             assert isinstance(response, dict)
             assert "models" in response
-            print(f"Server is available with {len(response['models'])} models")
+            print(f"Proxy server is available with {len(response['models'])} models from OpenAI")
 
         except Exception as e:
-            pytest.fail(f"Server not available: {e}")
+            pytest.fail(f"Proxy server not available: {e}")
 
-    def test_multiple_clients(self) -> None:
-        """Test multiple client instances."""
+    def test_multiple_proxy_clients(self) -> None:
+        """Test multiple client instances against our proxy server."""
         clients = [ollama.Client(host="http://localhost:11434") for _ in range(3)]
 
         responses = []
@@ -140,9 +140,9 @@ class TestRealServerEdgeCases:
             try:
                 response = client.list()
                 responses.append(response)
-                print(f"Client {i+1}: {len(response['models'])} models")
+                print(f"Client {i+1}: {len(response['models'])} models from proxy")
             except Exception as e:
-                pytest.fail(f"Client {i+1} failed: {e}")
+                pytest.fail(f"Client {i+1} failed to connect to proxy: {e}")
 
         # All clients should get responses
         assert len(responses) == 3

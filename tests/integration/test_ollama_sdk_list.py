@@ -1,4 +1,4 @@
-"""Integration tests for Ollama SDK against real servers."""
+"""Integration tests for Ollama SDK against our proxy server."""
 import concurrent.futures
 import os
 import time
@@ -14,7 +14,7 @@ ollama = pytest.importorskip("ollama", reason="ollama package required for SDK t
 @pytest.mark.sdk
 @pytest.mark.integration
 class TestOllamaSDKIntegration:
-    """Test Ollama SDK against real running servers."""
+    """Test Ollama SDK against our proxy server."""
 
     @pytest.fixture
     def ollama_client(self) -> Any:
@@ -34,7 +34,7 @@ class TestOllamaSDKIntegration:
             pytest.fail(f"Cannot connect to proxy server: {e}")
 
     def test_list_models_real_server(self, ollama_client: Any) -> None:
-        """Test model listing against real servers."""
+        """Test model listing against our proxy server."""
         response = ollama_client.list()
 
         # Verify response structure
@@ -42,9 +42,9 @@ class TestOllamaSDKIntegration:
         assert "models" in response
         assert isinstance(response["models"], list)
 
-        # In CI, we should have at least the tinyllama model from Ollama
-        # Models may come from either Ollama or OpenAI depending on config
-        print(f"Found {len(response['models'])} models")
+        # Our proxy translates OpenAI models to Ollama format
+        # With valid API key, should return OpenAI models
+        print(f"Found {len(response['models'])} models from OpenAI via proxy")
 
     def test_model_format_real_server(self, ollama_client: Any) -> None:
         """Test that model format matches Ollama SDK expectations."""
@@ -71,19 +71,19 @@ class TestOllamaSDKIntegration:
 
     @pytest.mark.slow
     def test_performance_real_server(self, ollama_client: Any) -> None:
-        """Test response time against real server."""
+        """Test response time against our proxy server."""
         start_time = time.time()
         response = ollama_client.list()
         duration = time.time() - start_time
 
-        # Should complete within reasonable time (allowing for network)
-        assert duration < 5.0  # 5 seconds max for real server
+        # Should complete within reasonable time (including OpenAI API call)
+        assert duration < 10.0  # 10 seconds max for OpenAI API call
         assert isinstance(response, dict)
 
         print(f"Response time: {duration*1000:.2f}ms")
 
     def test_concurrent_requests_real_server(self, ollama_client: Any) -> None:
-        """Test concurrent requests against real server."""
+        """Test concurrent requests against our proxy server."""
 
         def make_request() -> Any:
             client = ollama.Client(host="http://localhost:11434")
@@ -108,7 +108,7 @@ class TestOllamaSDKIntegration:
             assert "models" in result
 
     def test_error_handling_real_server(self, ollama_client: Any) -> None:
-        """Test error handling with real server."""
+        """Test error handling with invalid endpoints."""
         # Test with invalid client to trigger error
         invalid_client = ollama.Client(host="http://localhost:99999")
 
