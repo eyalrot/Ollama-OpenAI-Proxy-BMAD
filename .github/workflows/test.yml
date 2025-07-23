@@ -37,6 +37,36 @@ jobs:
         pip install -r requirements-dev.txt
         pip install -e .
     
+    - name: Install Ollama
+      run: |
+        curl -fsSL https://ollama.com/install.sh | sh
+    
+    - name: Start Ollama Server
+      run: |
+        # Start Ollama on port 11435 (different from proxy)
+        OLLAMA_HOST=0.0.0.0:11435 ollama serve &
+        # Wait for server to be ready
+        timeout 30 bash -c 'until curl -s http://localhost:11435/api/tags > /dev/null; do sleep 1; done'
+        echo "Ollama server is ready"
+      env:
+        OLLAMA_HOST: "0.0.0.0:11435"
+    
+    - name: Pull Test Model
+      run: |
+        OLLAMA_HOST=localhost:11435 ollama pull tinyllama
+      env:
+        OLLAMA_HOST: "localhost:11435"
+    
+    - name: Start Proxy Server
+      run: |
+        # Start the proxy server in background on port 11434
+        python -m ollama_openai_proxy &
+        # Wait for proxy server to be ready
+        timeout 30 bash -c 'until curl -s http://localhost:11434/api/tags > /dev/null; do sleep 1; done'
+        echo "Proxy server is ready"
+      env:
+        OLLAMA_BASE_URL: "http://localhost:11435"
+    
     - name: Run linting
       run: |
         ruff check src/ tests/
