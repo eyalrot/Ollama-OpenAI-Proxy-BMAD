@@ -419,8 +419,12 @@ class EnhancedTranslationService(TranslationService):
         openai_request = {
             "model": request.model,
             "messages": messages,
-            "stream": request.stream,
         }
+        
+        # Only add stream for non-streaming calls
+        # (streaming calls use create_chat_completion_stream which sets stream=True)
+        if not request.stream:
+            openai_request["stream"] = False
 
         # Map Ollama options to OpenAI parameters if provided
         if request.options:
