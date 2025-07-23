@@ -8,6 +8,7 @@ from fastapi.responses import JSONResponse
 
 from .config import get_settings
 from .exceptions import ConfigurationError
+from .services.openai_service import OpenAIService
 
 # Will be configured after settings are loaded
 logger = logging.getLogger(__name__)
@@ -35,6 +36,9 @@ async def lifespan(app: FastAPI):
         # Configure logging with the specified level
         configure_logging(settings.log_level)
         
+        # Initialize OpenAI service
+        openai_service = OpenAIService(settings)
+        
         # Log startup information
         logger.info(
             "Starting Ollama-OpenAI Proxy Service",
@@ -46,8 +50,9 @@ async def lifespan(app: FastAPI):
             }
         )
         
-        # Store settings in app state for access in routes
+        # Store in app state
         app.state.settings = settings
+        app.state.openai_service = openai_service
         
         yield
         
@@ -55,6 +60,9 @@ async def lifespan(app: FastAPI):
         logger.error(f"Failed to start application: {e}")
         raise ConfigurationError(f"Application startup failed: {e}") from e
     finally:
+        # Cleanup
+        if hasattr(app.state, "openai_service"):
+            await app.state.openai_service.close()
         logger.info("Shutting down Ollama-OpenAI Proxy Service")
 
 
@@ -116,6 +124,28 @@ async def validate_config() -> JSONResponse:
         raise HTTPException(
             status_code=500,
             detail=f"Configuration validation failed: {str(e)}"
+        )
+
+
+@app.get("/openai/health")
+async def openai_health_check() -> JSONResponse:
+    """Check OpenAI API connectivity."""
+    try:
+        service = app.state.openai_service
+        health = await service.health_check()
+        
+        status_code = 200 if health["status"] == "healthy" else 503
+        return JSONResponse(
+            status_code=status_code,
+            content=health
+        )
+    except Exception as e:
+        return JSONResponse(
+            status_code=503,
+            content={
+                "status": "error",
+                "error": str(e)
+            }
         )
 
 
