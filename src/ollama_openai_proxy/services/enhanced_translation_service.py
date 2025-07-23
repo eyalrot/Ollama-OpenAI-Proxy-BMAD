@@ -276,7 +276,7 @@ class EnhancedTranslationService(TranslationService):
         messages.append({"role": "user", "content": request.prompt})
 
         # Build OpenAI request
-        openai_request = {
+        openai_request: Dict[str, Any] = {
             "model": ModelRegistry.MODEL_ALIASES.get(request.model, request.model),
             "messages": messages,
         }
