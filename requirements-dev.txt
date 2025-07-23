@@ -11,3 +11,10 @@ jsonschema==4.25.0
 
 # Ollama SDK for compatibility testing
 ollama>=0.5.1
+
+# Additional test dependencies
+requests>=2.31.0
+
+# Type stubs for mypy
+types-PyYAML>=6.0.12
+types-requests>=2.31.0
