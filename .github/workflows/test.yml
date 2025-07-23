@@ -14,7 +14,7 @@ jobs:
         python-version: ["3.12"]
     
     env:
-      OPENAI_API_KEY: "test-key-12345"
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
       LOG_LEVEL: "DEBUG"
     
     steps:
@@ -49,9 +49,14 @@ jobs:
       run: |
         pytest tests/unit -v
     
-    - name: Run integration tests
+    - name: Run integration tests (no API key required)
       run: |
         pytest tests/integration -v -m "not requires_api_key"
+    
+    - name: Run integration tests (with API key)
+      if: ${{ secrets.OPENAI_API_KEY != '' }}
+      run: |
+        pytest tests/integration -v -m "requires_api_key"
     
     - name: Generate coverage report
       run: |
