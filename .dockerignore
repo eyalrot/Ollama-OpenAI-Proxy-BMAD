@@ -1,0 +1,70 @@
+# Git files
+.git/
+.gitignore
+.gitattributes
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Virtual environments
+venv/
+env/
+ENV/
+.venv
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Test and coverage files
+.coverage
+.coverage.*
+htmlcov/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+coverage.xml
+*.cover
+
+# Documentation
+docs/
+*.md
+!README.md
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+.travis.yml
+
+# Development files
+docker-compose.yml
+docker-compose.*.yml
+Makefile
+.env
+.env.*
+!.env.example
+
+# Temporary files
+tmp/
+temp/
+*.log
+*.tmp
+
+# BMad specific
+.bmad-core/
+daily-standup*.md
+sprint-planning/
+.ai/
+bmad-workflow-diagram.md

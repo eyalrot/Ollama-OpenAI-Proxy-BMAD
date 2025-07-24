@@ -1,0 +1,67 @@
+version: '3.8'
+
+services:
+  ollama-proxy:
+    image: ghcr.io/${GITHUB_REPOSITORY:-ollama-openai-proxy}/ollama-openai-proxy:${VERSION:-latest}
+    container_name: ollama-openai-proxy
+    restart: unless-stopped
+    
+    ports:
+      - "${PROXY_PORT:-11434}:11434"
+      
+    environment:
+      # Application settings
+      - ENV=production
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - OPENAI_API_BASE_URL=${OPENAI_API_BASE_URL:-https://api.openai.com/v1}
+      - PROXY_PORT=11434
+      - REQUEST_TIMEOUT=${REQUEST_TIMEOUT:-300}
+      
+    volumes:
+      # Log persistence
+      - ./logs:/app/logs:rw
+      # Timezone sync
+      - /etc/localtime:/etc/localtime:ro
+      
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:11434/health').read()"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+      
+    networks:
+      - proxy-network
+      
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.5'
+        reservations:
+          memory: 128M
+          cpus: '0.1'
+          
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+        labels: "service=ollama-proxy"
+        
+    security_opt:
+      - no-new-privileges:true
+      
+    labels:
+      - "com.example.description=Ollama OpenAI Proxy Service"
+      - "com.example.version=${VERSION:-latest}"
+      - "com.example.maintainer=your-team@example.com"
+
+networks:
+  proxy-network:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.20.0.0/16

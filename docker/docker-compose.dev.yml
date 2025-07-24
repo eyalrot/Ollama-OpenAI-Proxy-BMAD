@@ -1,0 +1,57 @@
+version: '3.8'
+
+services:
+  ollama-proxy-dev:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+      target: dev
+      
+    container_name: ollama-proxy-dev
+    
+    ports:
+      - "${PROXY_PORT:-11434}:11434"
+      # Debugger port for remote debugging
+      - "5678:5678"
+      
+    environment:
+      # Development settings
+      - ENV=development
+      - LOG_LEVEL=${LOG_LEVEL:-DEBUG}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - OPENAI_API_BASE_URL=${OPENAI_API_BASE_URL:-https://api.openai.com/v1}
+      - PROXY_PORT=11434
+      - REQUEST_TIMEOUT=${REQUEST_TIMEOUT:-300}
+      # Python development settings
+      - PYTHONDONTWRITEBYTECODE=1
+      - PYTHONUNBUFFERED=1
+      
+    volumes:
+      # Hot reload for source code
+      - ../src:/app/src:rw
+      - ../tests:/app/tests:rw
+      # Preserve pip cache between restarts
+      - dev-pip-cache:/home/appuser/.cache/pip
+      
+    command: python -m uvicorn ollama_openai_proxy.main:app --host 0.0.0.0 --port 11434 --reload --reload-dir /app/src
+    
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11434/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+      
+    networks:
+      - dev-network
+      
+    labels:
+      - "com.example.environment=development"
+
+volumes:
+  dev-pip-cache:
+    driver: local
+
+networks:
+  dev-network:
+    driver: bridge

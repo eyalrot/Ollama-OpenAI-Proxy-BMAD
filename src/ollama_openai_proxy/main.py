@@ -1,8 +1,12 @@
 """Main entry point for Ollama-OpenAI Proxy Service."""
 import logging
+import os
+import signal
 import sys
+import time
 from contextlib import asynccontextmanager
-from typing import AsyncIterator
+from datetime import datetime, timezone
+from typing import Any, AsyncIterator, Dict
 
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import JSONResponse
@@ -17,12 +21,27 @@ logger = logging.getLogger(__name__)
 
 __version__ = "0.1.0"
 
+# Metrics tracking
+metrics: Dict[str, Any] = {
+    "requests_total": 0,
+    "requests_success": 0,
+    "requests_failed": 0,
+    "last_request_time": None,
+}
+
 
 def configure_logging(log_level: str) -> None:
     """Configure application logging."""
+    # Configure container-friendly JSON logging
+    # Structured logging format for containers (unused variable for documentation)
+
     logging.basicConfig(
         level=getattr(logging, log_level),
-        format='{"time": "%(asctime)s", "level": "%(levelname)s", "logger": "%(name)s", "message": "%(message)s"}',
+        format=(
+            '{"time": "%(asctime)s", "level": "%(levelname)s", "logger": "%(name)s", '
+            '"message": "%(message)s", "container_id": "' + os.getenv("HOSTNAME", "unknown") + '", '
+            '"environment": "' + os.getenv("ENV", "production") + '"}'
+        ),
         handlers=[logging.StreamHandler(sys.stdout)],
         force=True,
     )
@@ -32,6 +51,9 @@ def configure_logging(log_level: str) -> None:
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     """Handle application startup and shutdown."""
     try:
+        # Record startup time
+        app.state.startup_time = time.time()
+
         # Load and validate settings
         settings = get_settings()
 
@@ -83,26 +105,170 @@ app.include_router(chat.router)
 app.include_router(embeddings.router)
 
 
+@app.middleware("http")
+async def track_metrics(request: Any, call_next: Any) -> Any:
+    """Track request metrics for monitoring."""
+    global metrics
+
+    start_time = time.time()
+    metrics["requests_total"] += 1
+
+    try:
+        response = await call_next(request)
+        if 200 <= response.status_code < 400:
+            metrics["requests_success"] += 1
+        else:
+            metrics["requests_failed"] += 1
+
+        # Track response time
+        duration = time.time() - start_time
+        response.headers["X-Response-Time"] = f"{duration:.3f}"
+
+        # Log request
+        logger.info(
+            "Request completed",
+            extra={
+                "method": request.method,
+                "path": request.url.path,
+                "status_code": response.status_code,
+                "duration_seconds": duration,
+                "client_host": request.client.host if request.client else "unknown",
+            },
+        )
+
+        metrics["last_request_time"] = datetime.now(timezone.utc).isoformat()
+        return response
+
+    except Exception as e:
+        metrics["requests_failed"] += 1
+        logger.error(f"Request failed: {e}")
+        raise
+
+
 @app.get("/health")
 async def health_check() -> JSONResponse:
-    """Health check endpoint."""
+    """
+    Comprehensive health check endpoint.
+    Returns detailed health status of the application and its dependencies.
+    """
+    health_info: Dict[str, Any] = {
+        "status": "healthy",
+        "version": __version__,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "environment": os.getenv("ENV", "production"),
+        "container_id": os.getenv("HOSTNAME", "unknown"),
+    }
+
     try:
         # Verify we can access settings
         settings = app.state.settings
+        health_info["configured"] = True
+        health_info["port"] = settings.proxy_port
 
-        return JSONResponse(
-            content={"status": "healthy", "version": __version__, "configured": True, "port": settings.proxy_port}
+        # Add uptime if available
+        if hasattr(app.state, "startup_time"):
+            health_info["uptime_seconds"] = int(time.time() - app.state.startup_time)
+
+        # Check OpenAI service health
+        if hasattr(app.state, "openai_service"):
+            try:
+                service = app.state.openai_service
+                openai_health = await service.health_check()
+                health_info["openai"] = {
+                    "status": openai_health["status"],
+                    "models_available": openai_health.get("models_available", 0),
+                }
+            except Exception as e:
+                health_info["openai"] = {
+                    "status": "error",
+                    "error": str(e),
+                }
+                health_info["status"] = "degraded"
+
+        status_code = 200 if health_info["status"] == "healthy" else 200  # Still return 200 for degraded
+        return JSONResponse(status_code=status_code, content=health_info)
+
+    except Exception as e:
+        health_info.update(
+            {
+                "status": "unhealthy",
+                "configured": False,
+                "error": str(e),
+            }
         )
-    except Exception:
+        return JSONResponse(status_code=503, content=health_info)
+
+
+@app.get("/ready")
+async def readiness_check() -> JSONResponse:
+    """
+    Readiness probe endpoint.
+    Checks if the application is ready to serve requests.
+    """
+    try:
+        # Check if all components are initialized
+        if not hasattr(app.state, "settings") or not hasattr(app.state, "openai_service"):
+            return JSONResponse(
+                status_code=503,
+                content={
+                    "status": "not_ready",
+                    "reason": "Service components not initialized",
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                },
+            )
+
+        # Check OpenAI service connectivity
+        service = app.state.openai_service
+        health = await service.health_check()
+
+        if health["status"] != "healthy":
+            return JSONResponse(
+                status_code=503,
+                content={
+                    "status": "not_ready",
+                    "reason": "OpenAI service not healthy",
+                    "details": health,
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                },
+            )
+
+        # All checks passed
+        return JSONResponse(
+            status_code=200,
+            content={
+                "status": "ready",
+                "version": __version__,
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "uptime_seconds": int(time.time() - app.state.startup_time),
+            },
+        )
+    except Exception as e:
+        logger.error(f"Readiness check failed: {e}")
         return JSONResponse(
             status_code=503,
             content={
-                "status": "unhealthy",
-                "version": __version__,
-                "configured": False,
-                "error": "Configuration not loaded",
+                "status": "not_ready",
+                "error": str(e),
+                "timestamp": datetime.now(timezone.utc).isoformat(),
             },
         )
+
+
+@app.get("/live")
+async def liveness_check() -> JSONResponse:
+    """
+    Liveness probe endpoint.
+    Simple check to verify the application process is alive and responsive.
+    """
+    return JSONResponse(
+        status_code=200,
+        content={
+            "status": "alive",
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "container_id": os.getenv("HOSTNAME", "unknown"),
+            "uptime_seconds": int(time.time() - app.state.startup_time) if hasattr(app.state, "startup_time") else 0,
+        },
+    )
 
 
 @app.get("/config/validate")
@@ -140,9 +306,58 @@ async def openai_health_check() -> JSONResponse:
         return JSONResponse(status_code=503, content={"status": "error", "error": str(e)})
 
 
+@app.get("/metrics")
+async def get_metrics() -> JSONResponse:
+    """
+    Application metrics endpoint for monitoring.
+    Returns Prometheus-compatible metrics.
+    """
+    global metrics
+
+    # Calculate success rate
+    success_rate = 0.0
+    if metrics["requests_total"] > 0:
+        success_rate = (metrics["requests_success"] / metrics["requests_total"]) * 100
+
+    # Get uptime
+    uptime_seconds = 0
+    if hasattr(app.state, "startup_time") and app.state.startup_time is not None:
+        uptime_seconds = int(time.time() - app.state.startup_time)
+
+    return JSONResponse(
+        content={
+            "app_info": {
+                "name": "ollama-openai-proxy",
+                "version": __version__,
+                "environment": os.getenv("ENV", "production"),
+                "container_id": os.getenv("HOSTNAME", "unknown"),
+            },
+            "uptime_seconds": uptime_seconds,
+            "requests": {
+                "total": metrics["requests_total"],
+                "success": metrics["requests_success"],
+                "failed": metrics["requests_failed"],
+                "success_rate_percent": round(success_rate, 2),
+                "last_request_time": metrics["last_request_time"],
+            },
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        }
+    )
+
+
+def handle_shutdown(signum: int, frame: Any) -> None:
+    """Handle graceful shutdown on SIGTERM/SIGINT."""
+    logger.info(f"Received signal {signum}, initiating graceful shutdown...")
+    sys.exit(0)
+
+
 def main() -> None:
     """Run the application."""
     import uvicorn
+
+    # Register signal handlers for graceful shutdown
+    signal.signal(signal.SIGTERM, handle_shutdown)
+    signal.signal(signal.SIGINT, handle_shutdown)
 
     try:
         # Load settings to fail fast if configuration is invalid
